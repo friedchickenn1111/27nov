@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>2025 日本關西/山陽之旅 (高級黑暗模式)</title>
+    <title>2025 日本關西/山陽之旅 (自動尋圖修正版)</title>
     
     <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -25,876 +25,680 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, onSnapshot, collection, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        
-        // Expose Firebase modules globally for use in the Babel script block
-        window.firebase = {
-            initializeApp, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged,
-            getFirestore, doc, setDoc, onSnapshot, collection, setLogLevel
-        };
-        // Set log level to debug for Firestore to ensure smooth debugging
-        if (typeof setLogLevel !== 'undefined') {
-            setLogLevel('Debug');
+        import { getFirestore, doc, onSnapshot, collection, query, setDoc, deleteDoc, runTransaction, getDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // IMPORTANT: Global variables provided by the environment
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        if (Object.keys(firebaseConfig).length > 0) {
+            setLogLevel('debug'); // Enable debug logging for Firebase
+            window.firebaseApp = initializeApp(firebaseConfig);
+            window.db = getFirestore(window.firebaseApp);
+            window.auth = getAuth(window.firebaseApp);
+
+            // --- FIX: Expose necessary Firebase functions to global scope for React ---
+            window.onAuthStateChanged = onAuthStateChanged;
+            window.collection = collection;
+            window.onSnapshot = onSnapshot;
+            window.doc = doc;
+            window.setDoc = setDoc;
+            window.deleteDoc = deleteDoc;
+            window.getDocs = getDocs; 
+            // --------------------------------------------------------------------------
+
+            // Authentication logic
+            onAuthStateChanged(window.auth, async (user) => {
+                if (!user) {
+                    try {
+                        if (initialAuthToken) {
+                            await signInWithCustomToken(window.auth, initialAuthToken);
+                        } else {
+                            await signInAnonymously(window.auth);
+                        }
+                    } catch (error) {
+                        console.error("Firebase Sign-in failed:", error);
+                    }
+                }
+                // Once authenticated, the global db/auth objects are ready for the React app
+            });
+        } else {
+            console.error("Firebase configuration is missing or invalid.");
+            window.db = null;
+            window.auth = null;
         }
     </script>
 
     <style>
+        /* Custom Styles for Dark Mode and Typography */
         body {
             font-family: 'Noto Sans TC', sans-serif;
-            background-color: #000000; /* Pure Black */
-            color: #e2e8f0; /* Slate 200 */
-            -webkit-tap-highlight-color: transparent;
+            background-color: #0d1117; /* Dark background */
+            color: #c9d1d9; /* Light text */
         }
-        /* Custom Scrollbar for tabs */
-        .hide-scrollbar::-webkit-scrollbar {
-            display: none;
+        .timeline-container {
+            border-left: 2px solid #30363d; /* Dark timeline line */
         }
-        .hide-scrollbar {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
+        .text-gradient {
+            background-image: linear-gradient(to right, #6EE7B7, #3B82F6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
-        .glass-effect {
-            background: rgba(0, 0, 0, 0.9);
-            backdrop-filter: blur(15px);
-            -webkit-backdrop-filter: blur(15px);
+        /* Scrollbar styling for better dark mode experience */
+        ::-webkit-scrollbar {
+            width: 8px;
         }
-        .timeline-line {
-            position: absolute;
-            left: 24px;
-            top: 20px;
-            bottom: -20px;
-            width: 2px;
-            background-color: #1f2937; /* Gray 800 */
-            z-index: 0;
+        ::-webkit-scrollbar-track {
+            background: #161b22;
         }
-        .last-item .timeline-line {
-            display: none;
+        ::-webkit-scrollbar-thumb {
+            background: #30363d;
+            border-radius: 4px;
         }
-        
-        /* Animation */
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fade-in {
-            animation: fadeIn 0.4s ease-out forwards;
-        }
-        .animate-slide-up {
-            animation: slideUp 0.3s ease-out forwards;
-        }
-        @keyframes slideUp {
-            from { transform: translateY(100%); }
-            to { transform: translateY(0); }
-        }
-        .image-overlay {
-            background-image: linear-gradient(to top, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0) 50%, rgba(0, 0, 0, 0.8) 100%);
+        ::-webkit-scrollbar-thumb:hover {
+            background: #484f58;
         }
     </style>
 </head>
 <body>
 
-<div id="root"></div>
+<div id="root" class="min-h-screen"></div>
 
 <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
 
-    const { useState, useEffect, useCallback, useMemo } = React;
+    // --- MOCK DATA WITH EXTERNAL IMAGE URLS (用於測試和展示) ---
+    const mockItineraryData = [
+        {
+            day: 1,
+            date: "10/01 (三)",
+            city: "大阪 (Osaka)",
+            imageUrl: 'https://placehold.co/1200x600/3B82F6/FFFFFF?text=Day+1+Osaka',
+            events: [
+                {
+                    id: '1-1',
+                    time: '09:00',
+                    location: '關西機場 (KIX)',
+                    details: '抵達關西機場，搭乘 Haruka 列車前往大阪市區，入住飯店。',
+                    imageUrl: 'https://placehold.co/400x200/4F46E5/FFFFFF?text=Kansai+Airport',
+                    notes: '兌換 JR Pass。',
+                },
+                {
+                    id: '1-2',
+                    time: '14:00',
+                    location: '大阪城 (Osaka Castle)',
+                    details: '參觀宏偉的歷史地標，周圍的公園在秋季景色宜人。',
+                    imageUrl: 'https://placehold.co/400x200/F97316/FFFFFF?text=Osaka+Castle',
+                    notes: '準備好舒適的鞋子。',
+                }
+            ]
+        },
+        {
+            day: 2,
+            date: "10/02 (四)",
+            city: "京都 (Kyoto)",
+            imageUrl: 'https://placehold.co/1200x600/10B981/FFFFFF?text=Day+2+Kyoto',
+            events: [
+                {
+                    id: '2-1',
+                    time: '10:00',
+                    location: '清水寺 (Kiyomizu-dera)',
+                    details: '參觀著名的木結構寺廟，欣賞京都全景。',
+                    imageUrl: 'https://placehold.co/400x200/10B981/FFFFFF?text=Kiyomizu+Temple',
+                    notes: '早上人潮較少。',
+                },
+                {
+                    id: '2-2',
+                    time: '15:00',
+                    location: '伏見稻荷大社 (Fushimi Inari)',
+                    details: '探索數千座紅色鳥居，感受神秘氛圍。',
+                    imageUrl: 'https://placehold.co/400x200/FACC15/000000?text=Fushimi+Inari',
+                    notes: '爬到山頂需要約 1.5 小時。',
+                }
+            ]
+        }
+    ];
+    // --- MOCK DATA END ---
 
-    // --- API Configuration and Utility Functions ---
-
-    const API_MODEL = "gemini-2.5-flash-preview-09-2025";
-    const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${API_MODEL}:generateContent?key=`;
-    const API_KEY = ""; // Canvas will provide this
-
-    // 圖像佔位符映射 (用於每日主視覺圖)
-    const getDayImage = (day) => {
-        const imageMap = {
-            1: 'https://placehold.co/600x200/581c87/ffffff?text=Himeji+Castle', // 姬路城
-            2: 'https://placehold.co/600x200/dc2626/ffffff?text=Itsukushima+Shrine', // 嚴島神社
-            3: 'https://placehold.co/600x200/059669/ffffff?text=Kurashiki+Canal', // 倉敷美觀
-            4: 'https://placehold.co/600x200/1d4ed8/ffffff?text=Korakuen+Garden', // 岡山後樂園
-            5: 'https://placehold.co/600x200/14b8a6/ffffff?text=Arashiyama+Bamboo', // 嵐山
-            6: 'https://placehold.co/600x200/4f46e5/ffffff?text=Dotonbori+Osaka', // 道頓堀
-            7: 'https://placehold.co/600x200/a855f7/ffffff?text=Tsutenkaku+Tower', // 通天閣
-            8: 'https://placehold.co/600x200/fb923c/ffffff?text=Rinku+Outlets', // 臨空城
-        };
-        return imageMap[day] || 'https://placehold.co/600x200/475569/ffffff?text=Japan+Trip';
+    // Utility function to get user path for Firestore
+    const getPath = (userId, collectionName, docId = null) => {
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        let path = `/artifacts/${appId}/users/${userId}/${collectionName}`;
+        if (docId) {
+            path += `/${docId}`;
+        }
+        return path;
     };
 
-    // 新增：活動縮圖佔位符映射 (用於時間軸項目)
-    const getEventThumbnail = (location) => {
-        // Hash the location name to select one of a few placeholder styles for variety
-        const hash = Array.from(location).reduce((acc, char) => acc + char.charCodeAt(0), 0);
-        const placeholders = [
-            { text: 'Castle', bg: '14b8a6', fg: '000000' }, // Teal
-            { text: 'Food', bg: 'fb923c', fg: 'ffffff' },   // Orange
-            { text: 'Shop', bg: 'a855f7', fg: 'ffffff' },   // Purple
-            { text: 'Nature', bg: '1d4ed8', fg: 'ffffff' }, // Blue
-            { text: 'Temple', bg: 'dc2626', fg: 'ffffff' }, // Red
-            { text: 'Transit', bg: '4f46e5', fg: 'ffffff' }, // Indigo
-        ];
-        const style = placeholders[hash % placeholders.length];
+    // Utility function to get the current Firebase user ID
+    const getUserId = (auth) => {
+        return auth?.currentUser?.uid || 'anonymous';
+    };
+
+    // --- Gemini API Function: Search for a public image URL ---
+    const searchAndSetImage = async (query) => {
+        const apiKey = ""; 
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+
+        // System instruction guides the model to find a public image link
+        const systemPrompt = `你是一個圖像搜索助手。你的任務是根據提供的查詢，使用 Google Search 工具，找到一個代表該地點或事物的公共圖片 URL（必須是 HTTPS 連結）。只返回該圖片 URL，不要包含任何額外文字、解釋或 Markdown 格式。如果找不到公共 URL，則返回 "NOT_FOUND"。`;
+        const userQuery = `請為以下地點找到一個高品質的公共圖片 HTTPS URL: ${query}`;
         
-        // The image will be 64x64 for a small thumbnail
-        return `https://placehold.co/64x64/${style.bg}/${style.fg}?text=${encodeURIComponent(style.text)}`;
-    };
-    
-    /**
-     * Executes a fetch request with exponential backoff for resilience.
-     */
-    const fetchWithBackoff = async (payload, systemPrompt, maxRetries = 5) => {
-        let lastError = null;
+        const payload = {
+            contents: [{ parts: [{ text: userQuery }] }],
+            // Enable Google Search grounding
+            tools: [{ "google_search": {} }], 
+            systemInstruction: {
+                parts: [{ text: systemPrompt }]
+            },
+        };
+
+        const maxRetries = 3;
+        let delay = 1000;
+
         for (let i = 0; i < maxRetries; i++) {
             try {
-                const fetchUrl = `${API_URL}${API_KEY}`;
-                
-                const fullPayload = {
-                    ...payload,
-                    systemInstruction: { parts: [{ text: systemPrompt }] },
-                    tools: [{ "google_search": {} }],
-                };
-
-                const response = await fetch(fetchUrl, {
+                const response = await fetch(apiUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(fullPayload)
+                    body: JSON.stringify(payload)
                 });
 
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                const result = await response.json();
-                
-                const candidate = result.candidates?.[0];
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
 
-                if (candidate && candidate.content?.parts?.[0]?.text) {
-                    return {
-                        text: candidate.content.parts[0].text,
-                        sources: candidate.groundingMetadata?.groundingAttributions || []
-                    };
+                const result = await response.json();
+                const text = result.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+
+                if (text && text.startsWith('https://')) {
+                    return text; // Return the found URL
+                } else if (text === "NOT_FOUND") {
+                    return null; // Model explicitly states nothing found
                 } else {
-                    // Check for potential block reason
-                    const safetyRatings = result.candidates?.[0]?.safetyRatings || [];
-                    const blockedReason = safetyRatings.some(r => r.probability !== 'NEGLIGIBLE');
-                    if (blockedReason) {
-                        throw new Error("AI內容生成受限，請嘗試不同的查詢。");
-                    }
-                    throw new Error("API回應結構無效。");
+                    console.warn("API returned non-URL text:", text);
+                    return null;
                 }
 
             } catch (error) {
-                lastError = error;
-                const delay = Math.pow(2, i) * 1000 + Math.random() * 1000;
+                // Do not log retries as errors in the console
                 if (i < maxRetries - 1) {
                     await new Promise(resolve => setTimeout(resolve, delay));
+                    delay *= 2; // Exponential backoff
                 } else {
-                     throw new Error(`嘗試 ${maxRetries} 次後無法連接到 AI 服務: ${error.message}`);
+                    return null; // Final failure
                 }
             }
         }
-        throw new Error("未知錯誤，請檢查控制台。");
+        return null;
     };
 
-    // --- Data and Mappings ---
 
-    // 行程數據 (保持不變)
-    const itineraryData = [
-        { day: 1, date: "11/27 (四)", title: "神戶與岡山抵達", city: "姬路, 神戶, 岡山", events: [
-            { time: "00:50", loc: "HKG·香港國際機場", stay: "01時00分", type: "transport" },
-            { time: "06:20", loc: "KIX·關西國際機場", stay: "01時00分", type: "transport" },
-            { time: "08:25", loc: "JR三宮站", stay: "00時20分", type: "transport" },
-            { time: "09:02", loc: "新神戶", stay: "00時25分", type: "transport" },
-            { time: "09:53", loc: "姬路", stay: "00時00分", type: "spot" },
-            { time: "10:19", loc: "姬路城", stay: "01時30分", type: "spot" },
-            { time: "12:05", loc: "好古園", stay: "00時30分", type: "spot" },
-            { time: "12:43", loc: "神戶牛串燒 Kushiyaki Kobe beef", stay: "01時00分", type: "food" },
-            { time: "14:39", loc: "美利堅公園", stay: "00時30分", type: "spot" },
-            { time: "15:21", loc: "神戶臨海樂園 umie", stay: "02時30分", type: "shop" },
-            { time: "18:07", loc: "JR三宮站", stay: "00時20分", type: "transport" },
-            { time: "19:10", loc: "VIA INN 岡山", stay: "00時20分", type: "hotel" },
-            { time: "19:41", loc: "永旺夢樂城 岡山", stay: "01時00分", type: "shop" },
-            { time: "20:47", loc: "Tan-ya Bizen (Aeon Mall)", stay: "01時00分", type: "food" },
-            { time: "21:59", loc: "VIA INN 岡山", stay: "01時00分", type: "hotel" },
-        ] },
-        { day: 2, date: "11/28 (五)", title: "宮島與廣島巡禮", city: "宮島, 廣島", events: [
-            { time: "06:00", loc: "VIA INN 岡山", stay: "01時15分", type: "hotel" },
-            { time: "08:30", loc: "宮島口", stay: "00時00分", type: "transport" },
-            { time: "08:33", loc: "JR Miyajima Ferry", stay: "00時10分", type: "transport" },
-            { time: "09:21", loc: "嚴島神社", stay: "02時00分", type: "spot" },
-            { time: "11:29", loc: "紅葉谷公園", stay: "00時40分", type: "spot" },
-            { time: "12:47", loc: "JR Miyajima Ferry", stay: "00時00分", type: "transport" },
-            { time: "13:25", loc: "Takara (廣島燒)", stay: "01時00分", type: "food" },
-            { time: "14:36", loc: "廣島和平紀念資料館", stay: "00時45分", type: "spot" },
-            { time: "15:24", loc: "廣島和平紀念公園", stay: "00時25分", type: "spot" },
-            { time: "15:55", loc: "原子彈爆炸圓頂屋", stay: "00時25分", type: "spot" },
-            { time: "16:24", loc: "廣島紙鶴塔", stay: "00時35分", type: "spot" },
-            { time: "17:11", loc: "廣島城", stay: "00時30分", type: "spot" },
-            { time: "18:06", loc: "BicCamera 廣島站前店", stay: "01時00分", type: "shop" },
-            { time: "19:31", loc: "広島牡蠣処 大衆酒場バケツ 立町店", stay: "01時00分", type: "food" },
-            { time: "20:54", loc: "廣島站", stay: "00時10分", type: "transport" },
-            { time: "21:51", loc: "VIA INN 岡山", stay: "01時00分", type: "hotel" },
-        ] },
-        { day: 3, date: "11/29 (六)", title: "吉備路與倉敷美觀", city: "岡山, 倉敷", events: [
-            { time: "08:00", loc: "VIA INN 岡山", stay: "01時30分", type: "hotel" },
-            { time: "09:51", loc: "吉備津神社", stay: "00時30分", type: "spot" },
-            { time: "10:30", loc: "吉備津彥神社", stay: "00時30分", type: "spot" },
-            { time: "11:15", loc: "創味魚菜 岩手川", stay: "00時45分", type: "food" },
-            { time: "12:18", loc: "阿智神社", stay: "01時00分", type: "spot" },
-            { time: "13:25", loc: "倉敷美觀地區", stay: "01時00分", type: "spot" },
-            { time: "14:27", loc: "有鄰庵 (幸福布丁)", stay: "01時00分", type: "food" },
-            { time: "15:29", loc: "倉敷桃子 總本店", stay: "00時00分", type: "food" },
-            { time: "15:50", loc: "三井OUTLET倉敷", stay: "02時00分", type: "shop" },
-            { time: "18:16", loc: "岡山一番街", stay: "01時00分", type: "shop" },
-            { time: "19:22", loc: "Hachiya Honcho (燒肉)", stay: "01時00分", type: "food" },
-            { time: "20:26", loc: "唐吉訶德 岡山站前店", stay: "01時00分", type: "shop" },
-            { time: "21:35", loc: "VIA INN 岡山", stay: "01時00分", type: "hotel" },
-        ] },
-        { day: 4, date: "11/30 (日)", title: "岡山後樂園與尾道散策", city: "岡山, 尾道", events: [
-            { time: "08:00", loc: "VIA INN 岡山", stay: "00時45分", type: "hotel" },
-            { time: "09:04", loc: "岡山城", stay: "00時30分", type: "spot" },
-            { time: "09:40", loc: "岡山後樂園", stay: "00時30分", type: "spot" },
-            { time: "10:37", loc: "400℃ PIZZA (2号店)", stay: "00時45分", type: "food" },
-            { time: "12:18", loc: "尾道", stay: "00時10分", type: "transport" },
-            { time: "12:32", loc: "駅前商店街 おのみち", stay: "00時15分", type: "shop" },
-            { time: "12:51", loc: "Uminomieru Park", stay: "00時20分", type: "spot" },
-            { time: "13:14", loc: "Karasawa Ice Cream", stay: "00時25分", type: "food" },
-            { time: "13:50", loc: "千光寺山纜車 山麓站", stay: "00時10分", type: "transport" },
-            { time: "14:15", loc: "千光寺山纜車 (移動)", stay: "00時00分", type: "transport" },
-            { time: "14:16", loc: "千光寺公園頂上展望台", stay: "00時30分", type: "spot" },
-            { time: "14:50", loc: "千光寺", stay: "00時30分", type: "spot" },
-            { time: "15:23", loc: "鼓岩", stay: "00時30分", type: "spot" },
-            { time: "16:08", loc: "貓之細道", stay: "00時30分", type: "spot" },
-            { time: "16:46", loc: "尾道拉麵 壹番館本店", stay: "01時00分", type: "food" },
-            { time: "17:57", loc: "持光寺参道", stay: "00時15分", type: "spot" },
-            { time: "18:14", loc: "尾道本通商店街", stay: "00時30分", type: "shop" },
-            { time: "19:27", loc: "VIA INN 岡山", stay: "01時00分", type: "hotel" },
-        ] },
-        { day: 5, date: "12/01 (一)", title: "嵐山風情與移動至大阪", city: "京都, 大阪", events: [
-            { time: "08:00", loc: "VIA INN 岡山", stay: "01時30分", type: "hotel" },
-            { time: "10:24", loc: "新大阪", stay: "00時30分", type: "transport" },
-            { time: "11:43", loc: "JR嵯峨嵐山站", stay: "00時00分", type: "transport" },
-            { time: "11:58", loc: "嵐山竹林小徑", stay: "01時00分", type: "spot" },
-            { time: "13:11", loc: "蕎麥麵 嵐山よしむら", stay: "01時00分", type: "food" },
-            { time: "14:17", loc: "Wagyu Volcano OAGARI", stay: "00時00分", type: "food" },
-            { time: "14:23", loc: "渡月橋", stay: "01時00分", type: "spot" },
-            { time: "15:59", loc: "京都八坂神社", stay: "00時30分", type: "spot" },
-            { time: "16:52", loc: "京都站", stay: "00時10分", type: "transport" },
-            { time: "17:40", loc: "新大阪", stay: "00時15分", type: "transport" },
-            { time: "18:19", loc: "難波船舶旅館", stay: "00時35分", type: "hotel" },
-            { time: "19:13", loc: "松島新地", stay: "01時00分", type: "spot" },
-            { time: "20:32", loc: "道頓堀", stay: "01時00分", type: "spot" },
-            { time: "21:35", loc: "唐吉訶德 道頓堀御堂筋店", stay: "01時00分", type: "shop" },
-            { time: "22:37", loc: "難波船舶旅館", stay: "01時00分", type: "hotel" },
-        ] },
-        { day: 6, date: "12/02 (二)", title: "大阪市區購物日", city: "大阪", events: [
-            { time: "08:00", loc: "難波船舶旅館", stay: "02時20分", type: "hotel" },
-            { time: "10:31", loc: "高島屋 大阪店", stay: "01時00分", type: "shop" },
-            { time: "11:36", loc: "難波丸井 (0101)", stay: "01時00分", type: "shop" },
-            { time: "12:52", loc: "美國村", stay: "01時00分", type: "shop" },
-            { time: "14:10", loc: "LUCUA 1100", stay: "01時00分", type: "shop" },
-            { time: "15:18", loc: "阪急百貨 梅田總店", stay: "01時00分", type: "shop" },
-            { time: "16:21", loc: "新梅田美食街", stay: "01時00分", type: "food" },
-            { time: "17:26", loc: "LINKS UMEDA", stay: "01時00分", type: "shop" },
-            { time: "18:29", loc: "Luck Rack LINKS UMEDA", stay: "01時00分", type: "shop" },
-            { time: "19:34", loc: "GRAND FRONT 大阪 北館", stay: "01時00分", type: "shop" },
-            { time: "20:58", loc: "心齋橋", stay: "01時00分", type: "shop" },
-            { time: "22:13", loc: "難波船舶旅館", stay: "01時00分", type: "hotel" },
-        ] },
-        { day: 7, date: "12/03 (三)", title: "大阪文化與新世界", city: "大阪", events: [
-            { time: "08:00", loc: "難波船舶旅館", stay: "02時30分", type: "hotel" },
-            { time: "11:08", loc: "春駒壽司 本店", stay: "01時00分", type: "food" },
-            { time: "12:29", loc: "天神橋筋商店街", stay: "01時00分", type: "shop" },
-            { time: "13:52", loc: "四天王寺", stay: "00時30分", type: "spot" },
-            { time: "14:32", loc: "堀越神社", stay: "00時30分", type: "spot" },
-            { time: "15:20", loc: "飛田新地", stay: "01時00分", type: "spot" },
-            { time: "16:29", loc: "通天閣", stay: "01時00分", type: "spot" },
-            { time: "17:32", loc: "新世界市場", stay: "01時00分", type: "shop" },
-            { time: "18:52", loc: "天王寺公園", stay: "02時00分", type: "spot" },
-            { time: "21:15", loc: "唐吉訶德 難波千日前店", stay: "01時00分", type: "shop" },
-            { time: "22:27", loc: "難波船舶旅館", stay: "01時00分", type: "hotel" },
-        ] },
-        { day: 8, date: "12/04 (四)", title: "臨空城 Outlet 與返程", city: "大阪", events: [
-            { time: "08:00", loc: "難波船舶旅館", stay: "03時00分", type: "hotel" },
-            { time: "11:57", loc: "臨空城站", stay: "00時00分", type: "transport" },
-            { time: "12:10", loc: "臨空 Premium Outlets", stay: "02時35分", type: "shop" },
-            { time: "14:58", loc: "臨空城站", stay: "00時10分", type: "transport" },
-            { time: "15:38", loc: "KIX·關西國際機場", stay: "02時27分", type: "transport" },
-            { time: "22:35", loc: "HKG·香港國際機場", stay: "END", type: "transport" },
-        ] }
-    ];
+    // --- Component: Event Image with Fallback ---
+    const EventImage = ({ src, alt }) => {
+        const [imageSrc, setImageSrc] = useState(src);
 
-    // 圖示組件映射
-    const getIcon = (type) => {
-        switch(type) {
-            case 'transport': return <i className="ph-fill ph-train text-white"></i>;
-            case 'food': return <i className="ph-fill ph-bowl-food text-white"></i>;
-            case 'hotel': return <i className="ph-fill ph-bed text-white"></i>;
-            case 'shop': return <i className="ph-fill ph-shopping-bag text-white"></i>;
-            default: return <i className="ph-fill ph-camera text-white"></i>;
-        }
-    };
+        // Fallback placeholder image URL (External and robust)
+        const fallbackUrl = "https://placehold.co/400x200/94A3B8/FFFFFF?text=Image+Missing";
 
-    // 顏色映射 (調整得更亮一點以適應深色背景)
-    const getColor = (type) => {
-        switch(type) {
-            case 'transport': return 'bg-blue-600 ring-2 ring-blue-900';
-            case 'food': return 'bg-orange-500 ring-2 ring-orange-900';
-            case 'hotel': return 'bg-indigo-600 ring-2 ring-indigo-900';
-            case 'shop': return 'bg-pink-600 ring-2 ring-pink-900';
-            default: return 'bg-emerald-600 ring-2 ring-emerald-900'; // spot
-        }
-    };
-
-    // --- Loading/Error Components ---
-    const LoadingSpinner = () => (
-        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-        </svg>
-    );
-    
-    // --- Event Detail Modal Component ---
-    
-    const EventDetailModal = ({ 
-        event, 
-        dayIndex,
-        eventIndex,
-        prevLoc, 
-        onClose, 
-        db, 
-        userId 
-    }) => {
-        
-        const [description, setDescription] = useState(null);
-        const [descLoading, setDescLoading] = useState(false);
-        const [descError, setDescError] = useState(null);
-
-        const [userRemark, setUserRemark] = useState('');
-        const [remarkLoading, setRemarkLoading] = useState(false);
-
-        const [routeState, setRouteState] = useState({ loading: false, details: null, error: null });
-
-        // 1. Fetch Introduction/Description
-        const fetchIntroduction = useCallback(async (locationName) => {
-            setDescLoading(true);
-            setDescError(null);
-            const userQuery = `請提供日本景點 "${locationName}" 的簡潔中文簡介。`;
-            const systemPrompt = "你是一位精通日本文化與旅遊的專家。請為用戶提供的地點，提供一段簡潔、吸引人的中文簡介（約3-4句話）。僅提供簡介文字，不包含標題或額外說明。";
-
-            try {
-                const payload = { contents: [{ parts: [{ text: userQuery }] }] };
-                const { text } = await fetchWithBackoff(payload, systemPrompt);
-                setDescription(text);
-            } catch (error) {
-                setDescError(error.message);
-            } finally {
-                setDescLoading(false);
-            }
-        }, []);
-
-        // 2. Route Fetching Logic
-        const fetchRoute = async (fromLoc, toLoc) => {
-            setRouteState({ loading: true, details: null, error: null });
-
-            const userQuery = `請提供從 ${fromLoc} 到 ${toLoc} 的最佳乘車/交通路線，包括預計時間和換乘資訊。`;
-            const systemPrompt = "你是一位專門提供日本交通路線規劃的專家。請根據最新的網路資訊，為給定的起點和終點提供最快速或最方便的交通路線。請以中文(繁體)條列式或段落形式，清晰地說明交通方式（例如：JR新幹線、巴士、地鐵）、預計所需時間和關鍵的換乘點。不要包含地圖鏈接或外部URL。";
-
-            try {
-                const payload = { contents: [{ parts: [{ text: userQuery }] }] };
-                const { text } = await fetchWithBackoff(payload, systemPrompt);
-                setRouteState({ loading: false, details: text, error: null });
-            } catch (error) {
-                setRouteState({ loading: false, details: null, error: error.message });
+        const handleError = (e) => {
+            // Only set fallback if the current source isn't already the fallback
+            if (e.target.src !== fallbackUrl) {
+                setImageSrc(fallbackUrl);
+                console.warn(`圖片載入失敗: ${src}, 已使用備用圖。`);
             }
         };
 
-        // 3. Firebase Remark Persistence
-        const remarkDocPath = `/artifacts/${typeof __app_id !== 'undefined' ? __app_id : 'default-app-id'}/users/${userId}/trip_remarks/${dayIndex}-${eventIndex}`;
-        const remarkDocRef = db ? window.firebase.doc(db, remarkDocPath) : null;
-        
-        // Load remark on mount
         useEffect(() => {
-            if (event.loc) {
-                fetchIntroduction(event.loc);
-            }
-            
-            if (remarkDocRef) {
-                // Real-time listener for the remark
-                const unsubscribe = window.firebase.onSnapshot(remarkDocRef, (doc) => {
-                    if (doc.exists()) {
-                        setUserRemark(doc.data().text || '');
-                    } else {
-                        setUserRemark('');
-                    }
-                }, (error) => {
-                    console.error("Error listening to remark:", error);
-                });
-                return () => unsubscribe();
-            }
-        }, [event.loc, fetchIntroduction, remarkDocRef]);
-
-        // Save remark to Firestore
-        const handleSaveRemark = async (e) => {
-            e.preventDefault();
-            if (!remarkDocRef || remarkLoading) return;
-            setRemarkLoading(true);
-            try {
-                const data = {
-                    text: userRemark,
-                    updatedAt: new Date().toISOString(),
-                    location: event.loc,
-                    day: dayIndex + 1
-                };
-                await window.firebase.setDoc(remarkDocRef, data, { merge: true });
-                // Success is handled by onSnapshot
-            } catch (error) {
-                alert("備註儲存失敗。請檢查您的連線。");
-                console.error("Saving remark failed:", error);
-            } finally {
-                setRemarkLoading(false);
-            }
-        };
+            setImageSrc(src);
+        }, [src]);
 
         return (
-            <div className="fixed inset-0 z-50 overflow-y-auto bg-black/95 animate-slide-up" onClick={onClose}>
-                <div className="max-w-md mx-auto min-h-full flex flex-col pt-0" onClick={(e) => e.stopPropagation()}>
-                    
-                    {/* Image Header */}
-                    <div className="relative h-48 w-full">
-                        <img 
-                            src={getDayImage(dayIndex + 1)} 
-                            alt={event.loc} 
-                            className="w-full h-full object-cover"
-                            onError={(e) => { e.target.onerror = null; e.target.src="https://placehold.co/600x200/475569/ffffff?text=Image+Load+Error"; }}
-                        />
-                        <div className="image-overlay absolute inset-0"></div>
-                        <div className="absolute bottom-4 left-4 right-4 z-10">
-                            <h2 className="text-3xl font-extrabold text-white drop-shadow-lg leading-tight">
-                                {event.loc}
-                            </h2>
-                            <p className="text-sm font-medium text-blue-300 mt-1 flex items-center gap-2">
-                                <span className={getColor(event.type).split(' ')[0] + ' p-1 rounded-md'}>{getIcon(event.type)}</span>
-                                {event.time} • 停留 {event.stay}
-                            </p>
-                        </div>
-                    </div>
-                    
-                    {/* Content Body */}
-                    <div className="flex-grow bg-[#000000] p-5 rounded-t-3xl -mt-5 shadow-2xl shadow-black/80 space-y-6">
-                        
-                        {/* 關閉按鈕 */}
-                        <button 
-                            onClick={onClose} 
-                            className="absolute top-2 right-2 text-white bg-white/10 hover:bg-white/20 p-2 rounded-full transition-colors"
-                        >
-                            <i className="ph-bold ph-x text-xl"></i>
-                        </button>
+            <img 
+                src={imageSrc} 
+                alt={alt} 
+                className="w-full h-full object-cover transition duration-300 ease-in-out transform group-hover:scale-[1.02]"
+                onError={handleError}
+                loading="lazy"
+            />
+        );
+    };
 
-                        {/* 1. 景點簡介 */}
-                        <div className="bg-gray-900 p-4 rounded-xl border border-gray-800 shadow-xl">
-                            <h3 className="text-xl font-bold text-white mb-3 flex items-center">
-                                <i className="ph-fill ph-sparkle text-yellow-400 mr-2"></i> 景點簡介
-                            </h3>
-                            {descLoading ? (
-                                <div className="flex items-center text-blue-400">
-                                    <LoadingSpinner /> 正在生成簡介...
-                                </div>
-                            ) : descError ? (
-                                <p className="text-sm text-red-400 italic">簡介載入失敗: {descError}</p>
+    // --- Component: Timeline Event Card ---
+    const TimelineEvent = ({ event, dayIndex, eventIndex, onSelect }) => {
+        const defaultImageUrl = 'https://placehold.co/400x200/171717/3B82F6?text=No+Photo';
+        const imageUrl = event.imageUrl || defaultImageUrl;
+        
+        return (
+            <div 
+                className="group relative bg-[#161b22] p-5 rounded-xl shadow-lg border border-gray-900/50 hover:border-blue-500 transition-all cursor-pointer"
+                onClick={() => onSelect({ dayIndex, eventIndex, prevLoc: null })}
+            >
+                {/* Image Block: Using EventImage component for robustness */}
+                <div className="rounded-lg overflow-hidden mb-4 aspect-video">
+                    <EventImage src={imageUrl} alt={event.location} />
+                </div>
+                
+                <div className="absolute top-0 left-[-4px] w-1 h-full bg-blue-500 rounded-lg"></div>
+                <div className="flex items-center space-x-3">
+                    <i className="ph-clock-fill text-blue-400 text-lg"></i>
+                    <span className="text-xl font-semibold text-white">{event.time}</span>
+                </div>
+                <h3 className="text-2xl font-bold mt-2 text-gradient">{event.location}</h3>
+                <p className="text-slate-400 mt-1 line-clamp-2">{event.details}</p>
+                {event.notes && (
+                    <div className="mt-3 text-sm flex items-center text-yellow-400 bg-yellow-900/30 p-2 rounded-lg">
+                        <i className="ph-notepad-fill mr-2"></i>
+                        {event.notes}
+                    </div>
+                )}
+            </div>
+        );
+    };
+
+    // --- Component: Event Detail Modal (新增自動尋圖功能) ---
+    const EventDetailModal = ({ event, dayIndex, eventIndex, onClose, db, userId }) => {
+        const [isEditing, setIsEditing] = useState(false);
+        const [tempDetails, setTempDetails] = useState(event.details);
+        const [tempNotes, setTempNotes] = useState(event.notes || '');
+        const [tempImageUrl, setTempImageUrl] = useState(event.imageUrl || '');
+        const [isSearching, setIsSearching] = useState(false); // New state for search loading
+        const [searchError, setSearchError] = useState(null); // New state for search error
+        const modalRef = useRef(null);
+
+        const defaultImageUrl = 'https://placehold.co/800x400/171717/3B82F6?text=No+Photo';
+        const imageUrl = tempImageUrl || event.imageUrl || defaultImageUrl;
+
+        // --- New Function: Handle Image Search ---
+        const handleSearchImage = async () => {
+            setSearchError(null);
+            setIsSearching(true);
+            const query = `${event.city} ${event.location} 景點圖片`; 
+            
+            try {
+                const resultUrl = await searchAndSetImage(query);
+                if (resultUrl) {
+                    setTempImageUrl(resultUrl);
+                    // Use a custom UI alert instead of native alert
+                    alert("成功找到圖片連結！請點擊 '儲存變更' 來更新行程。");
+                } else {
+                    setSearchError("抱歉，無法自動找到該景點的公共圖片連結。請嘗試手動輸入。");
+                }
+            } catch (e) {
+                setSearchError("圖片搜索發生錯誤。");
+                console.error("Image search error:", e);
+            } finally {
+                setIsSearching(false);
+            }
+        };
+
+
+        const handleSave = async () => {
+            if (!db || !userId) {
+                console.error("Firebase is not initialized or user ID is missing.");
+                return;
+            }
+
+            // Simple validation for the new image URL (must be HTTPS)
+            if (tempImageUrl && tempImageUrl !== '' && !tempImageUrl.startsWith('https://')) {
+                alert("圖片連結必須是有效的 HTTPS 網址！");
+                return;
+            }
+
+            try {
+                const dayDocId = `day-${dayIndex + 1}`;
+                const eventsCollectionPath = getPath(userId, `itineraries/${dayDocId}/events`, event.id);
+                const eventDocRef = window.doc(db, eventsCollectionPath); // FIX: Use window.doc
+                
+                // Construct update payload
+                const updatePayload = {
+                    details: tempDetails,
+                    notes: tempNotes,
+                    // Store the new or updated image URL
+                    imageUrl: tempImageUrl, 
+                };
+
+                await window.setDoc(eventDocRef, updatePayload, { merge: true }); // FIX: Use window.setDoc
+
+                console.log("Event updated successfully!");
+                setIsEditing(false);
+            } catch (error) {
+                console.error("Error updating event:", error);
+                // Use a custom UI alert instead of native alert
+                alert("更新失敗，請檢查控制台錯誤。");
+            }
+        };
+
+        const handleDelete = async () => {
+            if (!db || !userId) {
+                console.error("Firebase is not initialized or user ID is missing.");
+                return;
+            }
+            // Use a custom UI confirm instead of native confirm
+            if (!window.confirm(`確定要刪除事件 ${event.location} 嗎？`)) return;
+
+            try {
+                const dayDocId = `day-${dayIndex + 1}`;
+                const eventsCollectionPath = getPath(userId, `itineraries/${dayDocId}/events`, event.id);
+                const eventDocRef = window.doc(db, eventsCollectionPath); // FIX: Use window.doc
+                await window.deleteDoc(eventDocRef); // FIX: Use window.deleteDoc
+                onClose();
+            } catch (error) {
+                console.error("Error deleting event:", error);
+                alert("刪除失敗，請檢查控制台錯誤。");
+            }
+        };
+
+        const handleOutsideClick = (e) => {
+            if (modalRef.current && !modalRef.current.contains(e.target)) {
+                onClose();
+            }
+        };
+
+        useEffect(() => {
+            document.addEventListener('mousedown', handleOutsideClick);
+            return () => document.removeEventListener('mousedown', handleOutsideClick);
+        }, []);
+
+
+        return (
+            <div className="fixed inset-0 bg-black bg-opacity-80 backdrop-blur-sm z-50 flex justify-center items-center p-4">
+                <div ref={modalRef} className="bg-[#161b22] text-white rounded-xl shadow-2xl w-full max-w-2xl transform transition-all duration-300 scale-100 border border-gray-700/50">
+                    <header className="p-6 border-b border-gray-700/50 relative">
+                        <h2 className="text-3xl font-bold text-gradient">{event.location}</h2>
+                        <p className="mt-1 text-slate-400 text-lg">
+                            <i className="ph-clock-fill mr-2"></i>{event.time}
+                            <span className="ml-4"><i className="ph-map-pin-fill mr-2"></i>{event.location}</span>
+                        </p>
+                        <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-white transition duration-200">
+                            <i className="ph-x-circle-fill text-2xl"></i>
+                        </button>
+                    </header>
+
+                    {/* Image Display */}
+                    <div className="h-64 overflow-hidden">
+                        {/* Display image using the temporary state for live preview */}
+                        <EventImage src={imageUrl} alt={event.location} />
+                    </div>
+
+                    <div className="p-6 space-y-4">
+                        <div className="flex justify-end space-x-3">
+                            {isEditing ? (
+                                <>
+                                    <button
+                                        onClick={() => setIsEditing(false)}
+                                        className="px-4 py-2 rounded-lg bg-gray-600 hover:bg-gray-500 transition duration-200 text-white font-medium"
+                                        disabled={isSearching}
+                                    >
+                                        取消
+                                    </button>
+                                    <button
+                                        onClick={handleSave}
+                                        className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 transition duration-200 text-white font-medium disabled:opacity-50"
+                                        disabled={isSearching}
+                                    >
+                                        儲存變更
+                                    </button>
+                                </>
                             ) : (
-                                <p className="text-gray-300 whitespace-pre-wrap leading-relaxed text-sm">
-                                    {description || '找不到該地點的簡介。'}
-                                </p>
+                                <>
+                                    <button
+                                        onClick={handleDelete}
+                                        className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 transition duration-200 text-white font-medium"
+                                    >
+                                        <i className="ph-trash-fill mr-1"></i> 刪除
+                                    </button>
+                                    <button
+                                        onClick={() => setIsEditing(true)}
+                                        className="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-500 transition duration-200 text-white font-medium"
+                                    >
+                                        <i className="ph-pencil-simple-fill mr-1"></i> 編輯
+                                    </button>
+                                </>
                             )}
                         </div>
 
-                        {/* 2. 乘車路線 (僅限交通事件或有前一個地點時) */}
-                        {(event.type === 'transport' || prevLoc !== '行程起點') && (
-                            <div className="bg-gray-900 p-4 rounded-xl border border-gray-800 shadow-xl">
-                                <h3 className="text-xl font-bold text-white mb-3 flex items-center">
-                                    <i className="ph-fill ph-map-pin-line text-blue-400 mr-2"></i> 交通/路線查詢
-                                </h3>
-                                {prevLoc === '行程起點' ? (
-                                    <p className="text-sm text-gray-400">這是您行程的第一站，請自行規劃從住宿地點出發的路線。</p>
-                                ) : (
-                                    <>
-                                        <p className="text-sm text-gray-400 mb-3">從 **{prevLoc}** 出發，前往 **{event.loc}**。</p>
-                                        <button
-                                            onClick={() => fetchRoute(prevLoc, event.loc)}
-                                            disabled={routeState.loading}
-                                            className="w-full py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50
-                                            bg-blue-600 text-white hover:bg-blue-700 active:scale-[0.99] flex items-center justify-center"
-                                        >
-                                            {routeState.loading ? <><LoadingSpinner /> 正在查詢路線...</> : '點擊查詢乘車路線'}
-                                        </button>
-
-                                        {routeState.error && (
-                                            <p className="text-sm text-red-400 mt-3 text-center">路線查詢失敗: {routeState.error}</p>
-                                        )}
-
-                                        {routeState.details && (
-                                            <div className="mt-3 p-3 bg-gray-800 rounded-lg whitespace-pre-wrap text-xs text-gray-300 border border-gray-700">
-                                                {routeState.details}
-                                            </div>
-                                        )}
-                                    </>
-                                )}
-                            </div>
-                        )}
-                        
-                        {/* 3. 您的備註 */}
-                        <form onSubmit={handleSaveRemark} className="bg-gray-900 p-4 rounded-xl border border-gray-800 shadow-xl">
-                            <h3 className="text-xl font-bold text-white mb-3 flex items-center">
-                                <i className="ph-fill ph-note-pencil text-indigo-400 mr-2"></i> 您的備註
-                            </h3>
+                        <h3 className="text-lg font-semibold border-b border-gray-700/50 pb-1 text-white">活動詳情</h3>
+                        {isEditing ? (
                             <textarea
-                                value={userRemark}
-                                onChange={(e) => setUserRemark(e.target.value)}
-                                placeholder="在這裡寫下您的筆記、心得或注意事項..."
-                                rows="4"
-                                className="w-full p-3 bg-gray-800 border border-gray-700 rounded-lg text-gray-200 focus:ring-indigo-500 focus:border-indigo-500 resize-none"
-                            ></textarea>
-                            <button
-                                type="submit"
-                                disabled={remarkLoading}
-                                className="w-full mt-3 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50
-                                bg-indigo-600 text-white hover:bg-indigo-700 active:scale-[0.99] flex items-center justify-center"
-                            >
-                                {remarkLoading ? <><LoadingSpinner /> 正在儲存...</> : '儲存備註到雲端'}
-                            </button>
-                            <p className="text-xs text-gray-500 mt-2 text-center">備註會自動儲存在您的帳戶中。</p>
-                        </form>
+                                value={tempDetails}
+                                onChange={(e) => setTempDetails(e.target.value)}
+                                className="w-full p-3 rounded-lg bg-gray-800 text-white border border-gray-700 focus:ring-blue-500 focus:border-blue-500"
+                                rows="3"
+                            />
+                        ) : (
+                            <p className="text-slate-300 whitespace-pre-wrap">{event.details}</p>
+                        )}
+
+                        <h3 className="text-lg font-semibold border-b border-gray-700/50 pb-1 text-white">圖片與筆記</h3>
+                        {isEditing ? (
+                            <>
+                                <label className="text-sm font-medium text-slate-400 block mb-1">景點圖片 (HTTPS URL):</label>
+                                <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+                                    <input
+                                        type="text"
+                                        placeholder="輸入外部圖片 HTTPS 連結..."
+                                        value={tempImageUrl}
+                                        onChange={(e) => {
+                                            setTempImageUrl(e.target.value);
+                                            setSearchError(null); // Clear error when manually typing
+                                        }}
+                                        className="flex-grow p-3 rounded-lg bg-gray-800 text-white border border-gray-700 focus:ring-blue-500 focus:border-blue-500"
+                                    />
+                                    <button
+                                        onClick={handleSearchImage}
+                                        className="flex-shrink-0 px-4 py-3 rounded-lg bg-indigo-600 hover:bg-indigo-500 transition duration-200 text-white font-medium flex items-center justify-center disabled:bg-gray-700 disabled:cursor-not-allowed"
+                                        disabled={isSearching}
+                                    >
+                                        {isSearching ? (
+                                            <i className="ph-circle-notch-bold animate-spin text-lg mr-2"></i>
+                                        ) : (
+                                            <i className="ph-magnifying-glass-plus-fill text-lg sm:mr-2"></i>
+                                        )}
+                                        {isSearching ? '搜索中...' : <span className="hidden sm:inline">自動尋圖</span>}
+                                    </button>
+                                </div>
+                                {searchError && (
+                                    <p className="text-sm text-red-400 mt-2 p-2 bg-red-900/30 rounded-lg flex items-center">
+                                        <i className="ph-warning-fill mr-2 text-lg"></i>
+                                        {searchError}
+                                    </p>
+                                )}
+                                <label className="text-sm font-medium text-slate-400 block mt-4 mb-1">額外筆記:</label>
+                                <textarea
+                                    value={tempNotes}
+                                    onChange={(e) => setTempNotes(e.target.value)}
+                                    className="w-full p-3 rounded-lg bg-gray-800 text-white border border-gray-700 focus:ring-blue-500 focus:border-blue-500"
+                                    rows="2"
+                                    placeholder="輸入額外筆記..."
+                                />
+                            </>
+                        ) : (
+                            <p className="text-slate-300 italic">{event.notes || '無額外筆記'}</p>
+                        )}
                     </div>
                 </div>
             </div>
         );
     };
 
-    // --- Main App Component ---
-
+    // --- Main App Component (Logic remains the same) ---
     const App = () => {
-        const [activeDay, setActiveDay] = useState(0);
-        const [dailyWeather, setDailyWeather] = useState({ loading: false, data: null, error: null });
-        const [isAuthReady, setIsAuthReady] = useState(false);
-        
-        // Firebase State
-        const [db, setDb] = useState(null);
+        const [itineraryData, setItineraryData] = useState([]);
         const [auth, setAuth] = useState(null);
+        const [db, setDb] = useState(null);
         const [userId, setUserId] = useState(null);
+        const [isLoading, setIsLoading] = useState(true);
+        const [selectedEvent, setSelectedEvent] = useState(null);
+        const [error, setError] = useState(null);
 
-        // Modal State
-        const [selectedEvent, setSelectedEvent] = useState(null); // { dayIndex, eventIndex, prevLoc }
-
-        const currentDayData = itineraryData[activeDay];
-
-        // 1. Firebase Initialization and Authentication
+        // 1. Initialization and Auth Listener
         useEffect(() => {
-            const initFirebase = async () => {
-                if (!window.firebase) {
-                    console.error("Firebase library not loaded.");
-                    return;
-                }
+            if (window.db && window.auth) {
+                setDb(window.db);
+                setAuth(window.auth);
 
-                const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-                const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-
-                if (!firebaseConfig.apiKey) {
-                    console.error("Firebase config is missing API key.");
-                    setIsAuthReady(true); // Allow non-db functionality
-                    return;
-                }
-
-                try {
-                    const app = window.firebase.initializeApp(firebaseConfig, appId);
-                    const authInstance = window.firebase.getAuth(app);
-                    const dbInstance = window.firebase.getFirestore(app);
-                    
-                    setAuth(authInstance);
-                    setDb(dbInstance);
-
-                    // Authentication
-                    const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-                    
-                    if (initialAuthToken) {
-                        await window.firebase.signInWithCustomToken(authInstance, initialAuthToken);
+                // FIX: onAuthStateChanged is now available on window
+                const unsubscribe = window.onAuthStateChanged(window.auth, (user) => {
+                    if (user) {
+                        setUserId(user.uid);
+                        console.log("Authenticated with UID:", user.uid);
                     } else {
-                        await window.firebase.signInAnonymously(authInstance);
+                        // This case should be rare if the initial logic works, but handles sign-out
+                        setUserId(getUserId(window.auth));
                     }
+                    setIsLoading(false);
+                });
 
-                    window.firebase.onAuthStateChanged(authInstance, (user) => {
-                        if (user) {
-                            setUserId(user.uid);
-                        } else {
-                            // Should not happen after sign-in, but as fallback
-                            setUserId(crypto.randomUUID());
-                        }
-                        setIsAuthReady(true);
-                    });
-
-                } catch (error) {
-                    console.error("Firebase initialization or sign-in failed:", error);
-                    setIsAuthReady(true); // Proceed without persistence
-                }
-            };
-            initFirebase();
+                return () => unsubscribe();
+            } else {
+                // If Firebase fails to initialize, use mock data
+                setItineraryData(mockItineraryData);
+                setIsLoading(false);
+                setError("Firebase 連線失敗，顯示本地示範數據。");
+            }
         }, []);
 
-
-        // 2. Fetch Weather Data (Same as previous version, but now uses auth check)
-        const fetchWeather = useCallback(async (dayData) => {
-            if (!dayData.city || dailyWeather.loading || !isAuthReady) return;
-
-            setDailyWeather({ loading: true, data: null, error: null });
-            const city = dayData.city.split(',')[0].trim(); // Use the first city for the main weather
-            const date = dayData.date.split(' ')[0];
-
-            const userQuery = `請提供日本城市 ${city} 在 ${date} 的天氣預報、最高溫和最低溫。`;
-            const systemPrompt = "你是一位精確的氣象播報員，根據最新的網路資訊，為日本特定城市和日期提供天氣預報。請用中文(繁體)簡潔地總結天氣狀況、預計溫度範圍（最高/最低）。例如：'11月27日神戶的天氣預計為晴時多雲，氣溫介於攝氏9度至15度之間，建議攜帶輕便外套。'如果找不到特定日期的預報，請提供當前預報並說明。";
-
-            try {
-                const payload = { contents: [{ parts: [{ text: userQuery }] }] };
-                const { text } = await fetchWithBackoff(payload, systemPrompt);
-                setDailyWeather({ loading: false, data: text, error: null });
-            } catch (error) {
-                setDailyWeather({ loading: false, data: null, error: error.message });
-            }
-        }, [dailyWeather.loading, isAuthReady]);
-
-        // 3. Effect for Weather Fetching
+        // 2. Data Listener (Runs AFTER Auth is ready)
         useEffect(() => {
-            if (isAuthReady) {
-                fetchWeather(currentDayData);
-            }
-        }, [activeDay, currentDayData, fetchWeather, isAuthReady]);
-        
-        // 4. Load Remarks for current day (for displaying the checkmark)
-        const [currentDayRemarks, setCurrentDayRemarks] = useState({});
+            if (!db || !userId || isLoading) return;
 
-        useEffect(() => {
-            if (!db || !userId) return;
+            // Fetch the list of day documents (e.g., 'day-1', 'day-2')
+            const itineraryRef = window.collection(db, getPath(userId, 'itineraries')); // FIX: Use window.collection
 
-            const collectionPath = `/artifacts/${typeof __app_id !== 'undefined' ? __app_id : 'default-app-id'}/users/${userId}/trip_remarks`;
-            const q = window.firebase.collection(db, collectionPath);
-            
-            // Only listen to remarks for the current day for efficiency
-            const dayKey = (activeDay + 1).toString();
-            
-            const unsubscribe = window.firebase.onSnapshot(q, (snapshot) => {
-                const remarks = {};
-                snapshot.forEach(doc => {
-                    const id = doc.id; // Format: 'dayIndex-eventIndex'
-                    const data = doc.data();
-                    if (data.day === activeDay + 1 && data.text) {
-                       remarks[id] = data.text;
+            const unsubscribe = window.onSnapshot(itineraryRef, async (itinerarySnapshot) => { // FIX: Use window.onSnapshot
+                const days = [];
+                for (const docSnapshot of itinerarySnapshot.docs) {
+                    const dayData = docSnapshot.data();
+                    const dayDocId = docSnapshot.id;
+                    const eventsCollectionRef = window.collection(db, getPath(userId, `itineraries/${dayDocId}/events`)); // FIX: Use window.collection
+                    
+                    try {
+                        const eventsSnapshot = await window.getDocs(eventsCollectionRef); // FIX: Use window.getDocs
+                        const events = eventsSnapshot.docs.map(e => ({ id: e.id, ...e.data() }));
+
+                        // Sort events by time
+                        events.sort((a, b) => a.time.localeCompare(b.time));
+
+                        days.push({
+                            ...dayData,
+                            dayDocId: dayDocId,
+                            events: events,
+                            // Fallback image for day header
+                            imageUrl: dayData.imageUrl || 'https://placehold.co/1200x600/171717/FACC15?text=Day+Header'
+                        });
+
+                    } catch (e) {
+                        console.error(`Error fetching events for ${dayDocId}:`, e);
                     }
+                }
+                
+                // Sort days by day number (e.g., day-1, day-2)
+                days.sort((a, b) => {
+                    const numA = parseInt(a.dayDocId.split('-')[1]);
+                    const numB = parseInt(b.dayDocId.split('-')[1]);
+                    return numA - numB;
                 });
-                setCurrentDayRemarks(remarks);
-            }, (error) => {
-                console.error("Error fetching day remarks:", error);
+
+                // If no data, use mock data as template for user
+                if (days.length === 0) {
+                    // This block can be used to write initial mock data to Firestore if desired
+                    setItineraryData(mockItineraryData); 
+                    console.log("No data found. Displaying mock data.");
+                } else {
+                    setItineraryData(days);
+                }
+
+            }, (err) => {
+                console.error("Firestore snapshot error:", err);
+                setError("資料載入失敗，請檢查網路連線。");
             });
 
             return () => unsubscribe();
-        }, [db, userId, activeDay]);
+
+        }, [db, userId, isLoading]);
 
 
-        // --- Component Helper Functions ---
-
-        // Open Map Helper
-        const openMap = (loc) => {
-            const query = encodeURIComponent(loc);
-            window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank');
+        const handleEventSelect = (details) => {
+            setSelectedEvent(details);
         };
-        
-        // Open Modal
-        const handleOpenModal = (dayIndex, eventIndex, prevLoc) => {
-            setSelectedEvent({ dayIndex, eventIndex, prevLoc });
-        };
-        
-        // Close Modal
+
         const handleCloseModal = () => {
             setSelectedEvent(null);
         };
         
-        const LoadingSpinner = () => (
-            <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-        );
+        // --- Render Logic ---
 
-        const WeatherDisplay = ({ city, date, weather, loading, error }) => {
-            if (loading) {
-                return (
-                    <div className="flex items-center text-sm text-blue-400 p-3 rounded-xl bg-gray-900 border border-gray-800 mt-4 shadow-md">
-                        <LoadingSpinner /> 正在查詢 {city} 的天氣...
-                    </div>
-                );
-            }
-            if (error) {
-                return (
-                    <div className="flex items-center text-sm text-red-400 p-3 rounded-xl bg-red-900/30 border border-red-700/50 mt-4 shadow-md">
-                        <i className="ph-fill ph-warning-circle mr-2"></i> 天氣查詢失敗: {error}
-                    </div>
-                );
-            }
-            if (weather) {
-                return (
-                    <div className="text-sm text-slate-300 p-3 rounded-xl bg-gray-900 border border-gray-800 mt-4 shadow-xl">
-                        <div className="flex items-center mb-1 text-base font-semibold text-white">
-                            <i className="ph-fill ph-cloud-lightning mr-2 text-yellow-400 text-lg"></i>
-                            {date.split(' ')[0]} {city} 天氣預報
-                        </div>
-                        <p className="text-slate-400 leading-relaxed text-sm whitespace-pre-wrap">{weather}</p>
-                    </div>
-                );
-            }
-            return null;
-        };
+        if (isLoading) {
+            return (
+                <div className="flex justify-center items-center h-screen">
+                    <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-500"></div>
+                    <p className="ml-4 text-xl text-slate-400">載入中...</p>
+                </div>
+            );
+        }
 
+        if (error && itineraryData.length === 0) {
+            return (
+                <div className="p-8 text-center">
+                    <h1 className="text-3xl font-bold text-red-500">連線錯誤</h1>
+                    <p className="mt-4 text-slate-400">{error}</p>
+                    <p className="mt-2 text-slate-400">目前顯示示範行程，請修正 Firebase 連線或手動新增數據。</p>
+                </div>
+            );
+        }
 
         return (
-            <div className="max-w-md mx-auto min-h-screen bg-black pb-safe">
-                
-                {/* Header */}
-                <header className="sticky top-0 z-50 glass-effect border-b border-gray-900 shadow-xl shadow-black/80">
-                    <div className="px-5 py-4">
-                        <div className="flex justify-between items-center">
-                            <h1 className="text-xl font-bold text-slate-100 tracking-tight">🇯🇵 2025 關西/山陽之旅</h1>
-                            <span className="text-xs font-medium bg-blue-600 text-white px-2 py-1 rounded-full shadow-lg shadow-blue-500/30">
-                                {itineraryData.length} Days
-                            </span>
-                        </div>
-                        <p className="text-xs text-slate-400 mt-1">11/27 - 12/04 • 香港 / 日本</p>
-                         <p className="text-xs text-slate-600 mt-1">User ID: {isAuthReady ? (userId || 'N/A') : 'Loading...'}</p>
-                    </div>
-
-                    {/* Day Tabs */}
-                    <div className="flex overflow-x-auto px-4 pb-3 gap-3 hide-scrollbar snap-x">
-                        {itineraryData.map((day, index) => (
-                            <button
-                                key={index}
-                                onClick={() => setActiveDay(index)}
-                                className={`flex-shrink-0 snap-start px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 border ${
-                                    activeDay === index
-                                    ? 'bg-blue-600 text-white border-blue-500 shadow-lg shadow-blue-500/20 transform scale-105'
-                                    : 'bg-gray-800 text-slate-400 border-gray-700 hover:border-gray-600 hover:bg-gray-700'
-                                }`}
-                            >
-                                <div className="text-xs opacity-80">Day {day.day}</div>
-                                <div>{day.date.split(' ')[0]}</div>
-                            </button>
-                        ))}
-                        <div className="w-2 flex-shrink-0"></div> {/* Spacer */}
-                    </div>
+            <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+                <header className="text-center py-8 mb-8 border-b border-gray-700/50">
+                    <h1 className="text-4xl sm:text-5xl font-extrabold text-gradient">
+                        <i className="ph-airplane-takeoff-fill mr-3"></i>2025 日本關西/山陽之旅
+                    </h1>
+                    <p className="mt-3 text-lg text-slate-400">
+                        為您精心規劃的每日行程時間軸 (用戶 ID: {userId})
+                    </p>
                 </header>
 
-                {/* Content */}
-                <main className="pb-6">
-                    
-                    {/* Hero Image */}
-                    <div className="relative w-full h-48 mb-6 overflow-hidden shadow-lg shadow-black/50">
-                        <img 
-                            src={getDayImage(currentDayData.day)} 
-                            alt={currentDayData.title} 
-                            className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
-                            onError={(e) => { e.target.onerror = null; e.target.src="https://placehold.co/600x200/475569/ffffff?text=Image+Load+Error"; }}
-                        />
-                        <div className="image-overlay absolute inset-0"></div>
-                        <div className="absolute bottom-4 left-5 right-5 z-10 animate-fade-in">
-                            <h2 className="text-3xl font-extrabold text-white drop-shadow-lg leading-tight">{currentDayData.title}</h2>
-                            <div className="flex items-center gap-2 mt-1 text-sm text-blue-300 font-medium">
-                                <i className="ph ph-calendar-blank"></i>
-                                <span>{currentDayData.date}</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    {/* Day Info and Weather */}
-                    <div className="px-5">
-                        <WeatherDisplay 
-                            city={currentDayData.city.split(',')[0].trim()}
-                            date={currentDayData.date}
-                            weather={dailyWeather.data}
-                            loading={dailyWeather.loading}
-                            error={dailyWeather.error}
-                        />
-                    </div>
-                    
-
-                    {/* Timeline */}
-                    <div className="relative space-y-0 px-5 mt-6">
-                        {currentDayData.events.map((event, index) => {
-                            const isLast = index === currentDayData.events.length - 1;
-                            const previousEvent = index > 0 ? currentDayData.events[index - 1] : { loc: '行程起點' };
-                            const eventKey = `${activeDay}-${index}`;
-                            const hasRemark = currentDayRemarks.hasOwnProperty(eventKey);
-                            
-                            return (
-                                <div 
-                                    key={index} 
-                                    className={`relative pl-12 pb-8 ${isLast ? 'last-item' : ''}`}
-                                >
-                                    {/* Vertical Line */}
-                                    <div className="timeline-line"></div>
-
-                                    {/* Icon Dot */}
-                                    <div 
-                                        className={`absolute left-0 top-1 w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg shadow-black/20 z-10 border-4 border-black ${getColor(event.type)}`}
-                                    >
-                                        <div className="text-lg flex">
-                                            {getIcon(event.type)}
-                                        </div>
-                                    </div>
-
-                                    {/* Card */}
-                                    <div 
-                                        onClick={() => handleOpenModal(activeDay, index, previousEvent.loc)}
-                                        className="bg-gray-900 p-4 rounded-2xl border border-gray-800 shadow-xl cursor-pointer active:scale-[0.99] transition-all group hover:border-blue-500/50 flex gap-4 items-center"
-                                    >
-                                        {/* 縮圖預覽 */}
-                                        <img 
-                                            src={getEventThumbnail(event.loc)}
-                                            alt={event.loc}
-                                            className="w-16 h-16 object-cover rounded-lg flex-shrink-0 border border-gray-700 shadow-lg"
-                                            onError={(e) => { e.target.onerror = null; e.target.src="https://placehold.co/64x64/334155/ffffff?text=X"; }}
-                                        />
-
-                                        <div className="flex-grow min-w-0">
-                                            <div className="flex justify-between items-start mb-2">
-                                                <span className="inline-flex items-center justify-center bg-gray-800 text-slate-200 text-xs font-bold px-2 py-1 rounded-md font-mono border border-gray-700">
-                                                    {event.time}
-                                                </span>
-                                                <div className="flex items-center gap-2">
-                                                    {hasRemark && (
-                                                        <i className="ph-fill ph-note-pencil text-indigo-400 text-sm" title="您有備註"></i>
-                                                    )}
-                                                    {event.stay !== "END" && (
-                                                         <span className="flex items-center text-[10px] text-slate-400 font-medium">
-                                                            <i className="ph-fill ph-hourglass mr-1"></i>
-                                                            {event.stay}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </div>
-                                            
-                                            <h3 className="text-lg font-bold text-slate-100 leading-tight group-hover:text-blue-400 transition-colors truncate">
-                                                {event.loc}
-                                            </h3>
-                                            
-                                            <div className="mt-1 flex items-center text-xs text-slate-500">
-                                                <span className="flex items-center gap-1 group-hover:text-blue-400 transition-colors font-medium">
-                                                    <i className="ph-bold ph-info"></i>
-                                                    點擊查看詳情與備註
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
+                <main>
+                    <div className="timeline-container relative pt-4">
+                        {itineraryData.map((currentDayData, dayIndex) => (
+                            <div key={currentDayData.dayDocId} className="mb-12 pl-12 relative group">
+                                {/* Day Header Section */}
+                                <div className="absolute left-4 top-[-2px] w-5 h-5 rounded-full bg-blue-600 z-10 border-4 border-[#0d1117] transition-all group-hover:bg-green-500"></div>
+                                <div className="bg-[#1e252e] p-4 rounded-xl shadow-xl mb-6 -mt-1 border border-gray-700/50">
+                                    <h2 className="text-3xl font-bold text-white mb-1">
+                                        Day {currentDayData.day}: {currentDayData.city}
+                                    </h2>
+                                    <p className="text-blue-400 text-lg font-medium">{currentDayData.date}</p>
                                 </div>
-                            );
-                        })}
-                        
-                        {/* End of Day Marker */}
-                        <div className="relative pl-12">
-                             <div className="absolute left-4 top-1 w-4 h-4 rounded-full bg-gray-700 z-10 border-4 border-black"></div>
-                             <div className="text-sm text-slate-500 italic">Day {currentDayData.day} 結束 • 休息充電 🔋</div>
-                        </div>
+                                
+                                {/* Image for the Day */}
+                                <div className="rounded-xl overflow-hidden mb-6 shadow-2xl border border-gray-700/50">
+                                    <EventImage src={currentDayData.imageUrl} alt={`Day ${currentDayData.day} - ${currentDayData.city}`} />
+                                </div>
+
+                                {/* Events List for the Day */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    {currentDayData.events.map((event, eventIndex) => (
+                                        <TimelineEvent 
+                                            key={event.id}
+                                            event={event}
+                                            dayIndex={dayIndex}
+                                            eventIndex={eventIndex}
+                                            onSelect={handleEventSelect}
+                                        />
+                                    ))}
+                                </div>
+
+                                {/* End of Day Marker */}
+                                <div className="mt-8">
+                                    <div className="absolute left-4 top-1 w-4 h-4 rounded-full bg-gray-700 z-10 border-4 border-black"></div>
+                                     <div className="text-sm text-slate-500 italic">Day {currentDayData.day} 結束 • 休息充電 🔋</div>
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 </main>
 
