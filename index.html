@@ -1,498 +1,536 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>互動式行程規劃器</title>
+    <title>互動式行程規劃</title>
     <!-- 載入 Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- 使用 Inter 字體 -->
     <style>
+        /* 使用 Inter 字體以獲得更現代的外觀 */
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #f7f9fb; /* Light background for a clean vibe */
+            background-color: #f0f4f8; /* 淺藍色背景 */
         }
-        /* Custom scrollbar for aesthetics */
-        ::-webkit-scrollbar {
+        .container-card {
+            max-width: 800px; 
+            margin: 2rem auto;
+            padding: 2.5rem;
+            background: white;
+            border-radius: 1.5rem;
+            box-shadow: 0 15px 35px -5px rgba(0, 0, 0, 0.15);
+        }
+        /* 美化滾動條以匹配主題 */
+        #itinerary-list-container::-webkit-scrollbar {
             width: 8px;
         }
-        ::-webkit-scrollbar-thumb {
-            background-color: #cbd5e1;
-            border-radius: 10px;
+        #itinerary-list-container::-webkit-scrollbar-thumb {
+            background-color: #a78bfa; /* 紫色-400 */
+            border-radius: 4px;
+        }
+        #itinerary-list-container::-webkit-scrollbar-track {
+            background-color: #e5e7eb; /* 灰色-200 */
         }
     </style>
 </head>
-<body class="p-4 sm:p-8">
+<body>
 
-    <div id="app" class="max-w-4xl mx-auto bg-white rounded-3xl shadow-xl overflow-hidden">
+    <div class="container-card">
+        <h1 class="text-4xl font-extrabold text-center mb-8 text-gray-900">
+            您的互動式行程計劃
+        </h1>
         
-        <!-- Header -->
-        <header class="p-6 bg-indigo-600 text-white shadow-lg">
-            <h1 class="text-3xl font-bold tracking-tight">
-                山陽與關西 8 日之旅
-            </h1>
-            <p class="text-indigo-200 mt-1">互動式行程規劃與儲存</p>
-        </header>
-
-        <!-- Control Panel -->
-        <div class="p-6 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-3 sm:space-y-0">
-            <div id="auth-status" class="text-sm text-gray-600 flex items-center space-x-2">
-                <svg id="auth-icon" class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                <span id="auth-text">初始化驗證...</span>
+        <!-- 新增行程區塊 -->
+        <div class="space-y-4 mb-8 p-4 bg-purple-50 rounded-xl border border-purple-200">
+            <h2 class="text-xl font-bold text-purple-700">新增行程活動</h2>
+            
+            <div class="grid grid-cols-2 gap-4">
+                <!-- 日期與時間 -->
+                <input type="date" id="new-itinerary-date" 
+                       class="p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+                <input type="time" id="new-itinerary-time" 
+                       class="p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
             </div>
-            <div class="flex space-x-3">
-                <button id="load-btn" class="px-4 py-2 bg-green-500 text-white text-sm font-medium rounded-xl shadow hover:bg-green-600 transition duration-150 flex items-center disabled:opacity-50" disabled>
-                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                    載入行程
+
+            <!-- 地點/連結 -->
+            <input type="text" id="new-itinerary-location" placeholder="輸入地點或地圖連結 (例如：台北 101, Google Maps 連結)"
+                   class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+
+            <!-- 行程內容 -->
+            <div class="flex space-x-2">
+                <input type="text" id="new-itinerary-text" placeholder="行程活動描述 (例如：享用午餐並觀賞美景)"
+                       class="flex-grow p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+                
+                <button id="add-itinerary-btn" 
+                        class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-xl transition duration-200 ease-in-out shadow-lg hover:shadow-xl transform hover:scale-[1.02]">
+                    <svg class="w-5 h-5 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    新增
                 </button>
-                <button id="save-btn" class="px-4 py-2 bg-indigo-500 text-white text-sm font-medium rounded-xl shadow hover:bg-indigo-600 transition duration-150 flex items-center disabled:opacity-50" disabled>
-                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
-                    儲存行程
-                </button>
             </div>
         </div>
 
-        <!-- Itinerary List -->
-        <div id="itinerary-container" class="p-4 sm:p-6 space-y-4">
-            <!-- Itinerary days will be rendered here -->
-            <div class="text-center py-10 text-gray-500" id="loading-spinner">載入中...</div>
-        </div>
-        
-        <!-- Footer / Message Bar -->
-        <div id="message-bar" class="p-4 bg-gray-50 text-sm text-center text-gray-600 border-t border-gray-100 hidden">
-            行程已成功儲存/載入。
+        <!-- 行程清單區塊 -->
+        <div id="itinerary-list-container" class="space-y-6 max-h-[60vh] overflow-y-auto p-2">
+            <p class="text-center text-gray-500 p-4" id="loading-message">載入中，請稍候...</p>
         </div>
 
-        <!-- Modal for Itinerary Details (Not fully implemented, but structure is here) -->
-        <div id="modal-container" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
-            <div class="bg-white rounded-2xl p-6 w-full max-w-lg shadow-2xl">
-                <h3 class="text-xl font-bold mb-4">事件詳情</h3>
-                <p id="modal-content"></p>
-                <button onclick="document.getElementById('modal-container').classList.add('hidden')" class="mt-4 px-4 py-2 bg-red-500 text-white rounded-xl hover:bg-red-600">關閉</button>
-            </div>
+        <div class="mt-8 text-xs text-center p-3 rounded-xl bg-gray-100 text-gray-600">
+            * 您的所有行程資料都安全地儲存在您的瀏覽器本地儲存空間 (LocalStorage) 中。
         </div>
-
     </div>
 
-    <!-- Firebase SDKs -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    <script>
+        const STORAGE_KEY = 'interactive_travel_planner_v2';
+        const addTodoBtn = document.getElementById('add-itinerary-btn');
+        const newTodoTextEl = document.getElementById('new-itinerary-text');
+        const newTodoDateEl = document.getElementById('new-itinerary-date');
+        const newTodoTimeEl = document.getElementById('new-itinerary-time');
+        const newTodoLocationEl = document.getElementById('new-itinerary-location');
+        const todoListContainer = document.getElementById('itinerary-list-container');
+        const loadingMessageEl = document.getElementById('loading-message');
 
-        // 設定 Firestore 偵錯日誌
-        setLogLevel('Debug');
+        // 初始化日期輸入為今日日期，時間為上午 09:00
+        const today = new Date().toISOString().slice(0, 10);
+        newTodoDateEl.value = today;
+        newTodoTimeEl.value = '09:00'; 
 
-        // 全域變數，從 Canvas 環境提供
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
-        // Firebase 服務實例
-        let app, db, auth;
-        let userId = null;
-        let isAuthReady = false;
+        // --- 1. 儲存/載入資料的輔助函數 (使用 localStorage) ---
 
-        const PUBLIC_COLLECTION_PATH = `/artifacts/${appId}/public/data/itineraries`;
-        const DOCUMENT_ID = 'main-trip'; // 用於儲存和載入行程的固定文件 ID
+        /**
+         * 預載入的行程數據（香港/岡山/廣島/大阪 8天遊）。
+         * @returns {Array<Object>} 預設行程陣列。
+         */
+        function getDefaultItinerary() {
+            return [
+                // Day 1 (2025-11-27) - 姬路, 神戶, 岡山
+                { id: 1, date: '2025-11-27', time: '00:50', location: 'HKG·香港國際機場', text: '出發前往關西國際機場 (KIX)', completed: false },
+                { id: 2, date: '2025-11-27', time: '06:20', location: 'KIX·關西國際機場', text: '抵達關西國際機場', completed: false },
+                { id: 3, date: '2025-11-27', time: '08:25', location: 'JR三宮站', text: '交通轉乘', completed: false },
+                { id: 4, date: '2025-11-27', time: '09:02', location: '新神戶', text: '交通轉乘', completed: false },
+                { id: 5, date: '2025-11-27', time: '09:53', location: '姬路', text: '抵達姬路，準備觀光', completed: false },
+                { id: 6, date: '2025-11-27', time: '10:19', location: '姬路城', text: '參觀世界遺產姬路城', completed: false },
+                { id: 7, date: '2025-11-27', time: '12:05', location: '好古園', text: '參觀好古園日式庭園', completed: false },
+                { id: 8, date: '2025-11-27', time: '12:43', location: '神戶牛串燒 Kushiyaki Kobe beef', text: '午餐：品嚐神戶牛串燒', completed: false },
+                { id: 9, date: '2025-11-27', time: '14:39', location: '美利堅公園', text: '參觀美利堅公園', completed: false },
+                { id: 10, date: '2025-11-27', time: '15:21', location: '神戶臨海樂園 umie', text: '購物與休閒', completed: false },
+                { id: 11, date: '2025-11-27', time: '18:07', location: 'JR三宮站', text: '返回三宮站，前往岡山', completed: false },
+                { id: 12, date: '2025-11-27', time: '19:10', location: 'VIA INN 岡山', text: '入住飯店', completed: false },
+                { id: 13, date: '2025-11-27', time: '19:41', location: '永旺夢樂城 岡山', text: '逛永旺夢樂城', completed: false },
+                { id: 14, date: '2025-11-27', time: '20:47', location: 'Tan-ya Bizen (Aeon Mall Okayama)', text: '晚餐：Tan-ya Bizen', completed: false },
+                { id: 15, date: '2025-11-27', time: '21:59', location: 'VIA INN 岡山', text: '回飯店休息', completed: false },
 
-        // 初始行程數據
-        let itineraryData = [
-            { day: "第1天", date: "2025/11/27", expanded: true, events: [
-                { time: "00:50", location: "HKG·香港國際機場", duration: "01時00分", icon: "✈️" },
-                { time: "06:20", location: "KIX·關西國際機場", duration: "01時00分", icon: "✈️" },
-                { time: "08:25", location: "JR三宮站", duration: "00時20分", icon: "🚆" },
-                { time: "09:02", location: "新神戶", duration: "00時25分", icon: "🚆" },
-                { time: "09:53", location: "姬路", duration: "00時00分", icon: "🚶" },
-                { time: "10:19", location: "姬路城", duration: "01時30分", icon: "🏰" },
-                { time: "12:05", location: "好古園", duration: "00時30分", icon: "🌳" },
-                { time: "12:43", location: "神戶牛串燒 Kushiyaki Kobe beef", duration: "01時00分", icon: "🥩" },
-                { time: "14:39", location: "美利堅公園", duration: "00時30分", icon: "🚢" },
-                { time: "15:21", location: "神戶臨海樂園 umie", duration: "02時30分", icon: "🛍️" },
-                { time: "18:07", location: "JR三宮站", duration: "00時20分", icon: "🚆" },
-                { time: "19:10", location: "VIA INN 岡山", duration: "00時20分", icon: "🏨" },
-                { time: "19:41", location: "永旺夢樂城 岡山", duration: "01時00分", icon: "🛒" },
-                { time: "20:47", location: "Tan-ya Bizen (Aeon Mall Okayama)", duration: "01時00分", icon: "🍽️" },
-                { time: "21:59", location: "VIA INN 岡山", duration: "01時00分", icon: "🛌" },
-            ]},
-            { day: "第2天", date: "2025/11/28", expanded: false, events: [
-                { time: "06:00", location: "VIA INN 岡山", duration: "01時15分", icon: "⏰" },
-                { time: "08:30", location: "宮島口", duration: "00時00分", icon: "🚢" },
-                { time: "08:33", location: "JR Miyajima Ferry", duration: "00時10分", icon: "⛴️" },
-                { time: "09:21", location: "嚴島神社", duration: "02時00分", icon: "⛩️" },
-                { time: "11:29", location: "紅葉谷公園", duration: "00時40分", icon: "🍁" },
-                { time: "12:47", location: "JR Miyajima Ferry", duration: "00時00分", icon: "⛴️" },
-                { time: "13:25", location: "Takara", duration: "01時00分", icon: "🍽️" },
-                { time: "14:36", location: "廣島和平紀念資料館", duration: "00時45分", icon: "🏛️" },
-                { time: "15:24", location: "廣島和平紀念公園", duration: "00時25分", icon: "🌳" },
-                { time: "15:55", location: "原子彈爆炸圓頂屋", duration: "00時25分", icon: "💀" },
-                { time: "16:24", location: "廣島紙鶴塔", duration: "00時35分", icon: "🗼" },
-                { time: "17:11", location: "廣島城", duration: "00時30分", icon: "🏰" },
-                { time: "18:06", location: "BicCamera 廣島站前店", duration: "01時00分", icon: "📸" },
-                { time: "19:31", location: "広島牡蠣処 大衆酒場バケツ 立町店", duration: "01時00分", icon: "🦪" },
-                { time: "20:54", location: "廣島", duration: "00時10分", icon: "🚆" },
-                { time: "21:51", location: "VIA INN 岡山", duration: "01時00分", icon: "🛌" },
-            ]},
-            { day: "第3天", date: "2025/11/29", expanded: false, events: [
-                { time: "08:00", location: "VIA INN 岡山", duration: "01時30分", icon: "⏰" },
-                { time: "09:51", location: "吉備津神社", duration: "00時30分", icon: "⛩️" },
-                { time: "10:30", location: "吉備津彥神社", duration: "00時30分", icon: "⛩️" },
-                { time: "11:15", location: "創味魚菜 岩手川", duration: "00時45分", icon: "🍽️" },
-                { time: "12:18", location: "阿智神社", duration: "01時00分", icon: "⛩️" },
-                { time: "13:25", location: "倉敷美觀地區", duration: "01時00分", icon: "🏘️" },
-                { time: "14:27", location: "有鄰庵", duration: "01時00分", icon: "☕" },
-                { time: "15:29", location: "倉敷桃子 總本店", duration: "00時00分", icon: "🍑" },
-                { time: "15:50", location: "三井OUTLET倉敷", duration: "02時00分", icon: "🛍️" },
-                { time: "18:16", location: "岡山一番街", duration: "01時00分", icon: "🛒" },
-                { time: "19:22", location: "Yakiniku dining Hachiya Honcho shop", duration: "01時00分", icon: "🥩" },
-                { time: "20:26", location: "驚安の殿堂 唐吉訶德 岡山站前店", duration: "01時00分", icon: "🛒" },
-                { time: "21:35", location: "VIA INN 岡山", duration: "01時00分", icon: "🛌" },
-            ]},
-            { day: "第4天", date: "2025/11/30", expanded: false, events: [
-                { time: "08:00", location: "VIA INN 岡山", duration: "00時45分", icon: "⏰" },
-                { time: "09:04", location: "岡山城", duration: "00時30分", icon: "🏰" },
-                { time: "09:40", location: "岡山後樂園", duration: "00時30分", icon: "🌳" },
-                { time: "10:37", location: "400℃ PIZZA モリノマチ (2号店)", duration: "00時45分", icon: "🍕" },
-                { time: "12:18", location: "尾道", duration: "00時10分", icon: "🚆" },
-                { time: "12:32", location: "駅前商店街 おのみち", duration: "00時15分", icon: "🛍️" },
-                { time: "12:51", location: "Uminomieru Park", duration: "00時20分", icon: "🏞️" },
-                { time: "13:14", location: "Karasawa Ice Cream", duration: "00時25分", icon: "🍦" },
-                { time: "13:50", location: "千光寺山纜車 山麓站", duration: "00時10分", icon: "🚠" },
-                { time: "14:15", location: "千光寺山纜車", duration: "00時00分", icon: "🚠" },
-                { time: "14:16", location: "千光寺公園頂上展望台", duration: "00時30分", icon: "🔭" },
-                { time: "14:50", location: "千光寺", duration: "00時30分", icon: "🙏" },
-                { time: "15:23", location: "鼓岩", duration: "00時30分", icon: "🪨" },
-                { time: "16:08", location: "貓之細道", duration: "00時30分", icon: "🐈" },
-                { time: "16:46", location: "尾道拉麵 壹番館本店", duration: "01時00分", icon: "🍜" },
-                { time: "17:57", location: "持光寺参道", duration: "00時15分", icon: "🙏" },
-                { time: "18:14", location: "尾道本通商店街", duration: "00時30分", icon: "🛍️" },
-                { time: "19:27", location: "VIA INN 岡山", duration: "01時00分", icon: "🛌" },
-            ]},
-            { day: "第5天", date: "2025/12/01", expanded: false, events: [
-                { time: "08:00", location: "VIA INN 岡山", duration: "01時30分", icon: "⏰" },
-                { time: "10:24", location: "新大阪", duration: "00時30分", icon: "🚆" },
-                { time: "11:43", location: "JR嵯峨嵐山站", duration: "00時00分", icon: "🚆" },
-                { time: "11:58", location: "嵐山竹林小徑", duration: "01時00分", icon: "🎍" },
-                { time: "13:11", location: "蕎麥麵 嵐山よしむら", duration: "01時00分", icon: "🍜" },
-                { time: "14:17", location: "Wagyu Volcano OAGARI, Arashiyama", duration: "00時00分", icon: "🥩" },
-                { time: "14:23", location: "渡月橋", duration: "01時00分", icon: "🌉" },
-                { time: "15:59", location: "京都八坂神社", duration: "00時30分", icon: "⛩️" },
-                { time: "16:52", location: "京都站", duration: "00時10分", icon: "🚆" },
-                { time: "17:40", location: "新大阪", duration: "00時15分", icon: "🚆" },
-                { time: "18:19", location: "難波船舶旅館", duration: "00時35分", icon: "🏨" },
-                { time: "19:13", location: "松島新地", duration: "01時00分", icon: "🌃" },
-                { time: "20:32", location: "道頓堀", duration: "01時00分", icon: "🦀" },
-                { time: "21:35", location: "唐吉訶德 道頓堀御堂筋店", duration: "01時00分", icon: "🛒" },
-                { time: "22:37", location: "難波船舶旅館", duration: "01時00分", icon: "🛌" },
-            ]},
-            { day: "第6天", date: "2025/12/02", expanded: false, events: [
-                { time: "08:00", location: "難波船舶旅館", duration: "02時20分", icon: "⏰" },
-                { time: "10:31", location: "高島屋 大阪店", duration: "01時00分", icon: "🛍️" },
-                { time: "11:36", location: "難波丸井", duration: "01時00分", icon: "🛍️" },
-                { time: "12:52", location: "美國村", duration: "01時00分", icon: "👕" },
-                { time: "14:10", location: "LUCUA 1100", duration: "01時00分", icon: "🛍️" },
-                { time: "15:18", location: "Hankyu Department Store Umeda Main Store", duration: "01時00分", icon: "🛍️" },
-                { time: "16:21", location: "新梅田美食街", duration: "01時00分", icon: "🍽️" },
-                { time: "17:26", location: "LINKS UMEDA", duration: "01時00分", icon: "🛍️" },
-                { time: "18:29", location: "Luck Rack LINKS UMEDA Store", duration: "01時00分", icon: "🛍️" },
-                { time: "19:34", location: "GRAND FRONT 大阪 北館", duration: "01時00分", icon: "🛍️" },
-                { time: "20:58", location: "心齋橋", duration: "01時00分", icon: "🛍️" },
-                { time: "22:13", location: "難波船舶旅館", duration: "01時00分", icon: "🛌" },
-            ]},
-            { day: "第7天", date: "2025/12/03", expanded: false, events: [
-                { time: "08:00", location: "難波船舶旅館", duration: "02時30分", icon: "⏰" },
-                { time: "11:08", location: "春駒壽司 本店", duration: "01時00分", icon: "🍣" },
-                { time: "12:29", location: "天神橋筋商店街", duration: "01時00分", icon: "🛍️" },
-                { time: "13:52", location: "四天王寺", duration: "00時30分", icon: "🙏" },
-                { time: "14:32", location: "堀越神社", duration: "00時30分", icon: "⛩️" },
-                { time: "15:20", location: "飛田新地", duration: "01時00分", icon: "🌃" },
-                { time: "16:29", location: "通天閣", duration: "01時00分", icon: "🗼" },
-                { time: "17:32", location: "新世界市場", duration: "01時00分", icon: "🛍️" },
-                { time: "18:52", location: "天王寺公園", duration: "02時00分", icon: "🌳" },
-                { time: "21:15", location: "驚安殿堂唐吉訶德難波千日前店", duration: "01時00分", icon: "🛒" },
-                { time: "22:27", location: "難波船舶旅館", duration: "01時00分", icon: "🛌" },
-            ]},
-            { day: "第8天", date: "2025/12/04", expanded: false, events: [
-                { time: "08:00", location: "難波船舶旅館", duration: "03時00分", icon: "⏰" },
-                { time: "11:57", location: "臨空城", duration: "00時00分", icon: "🚆" },
-                { time: "12:10", location: "りんくうプレミアム・アウトレット", duration: "02時35分", icon: "🛍️" },
-                { time: "14:58", location: "臨空城", duration: "00時10分", icon: "🚆" },
-                { time: "15:38", location: "KIX·關西國際機場", duration: "02時27分", icon: "✈️" },
-                { time: "22:35", location: "HKG·香港國際機場", duration: "00時00分", icon: "🏠" },
-            ]},
-        ];
+                // Day 2 (2025-11-28) - 宮島, 廣島
+                { id: 16, date: '2025-11-28', time: '06:00', location: 'VIA INN 岡山', text: '飯店退房/寄放行李，出發前往廣島', completed: false },
+                { id: 17, date: '2025-11-28', time: '08:30', location: '宮島口', text: '抵達宮島口', completed: false },
+                { id: 18, date: '2025-11-28', time: '08:33', location: 'JR Miyajima Ferry', text: '搭乘渡輪前往宮島', completed: false },
+                { id: 19, date: '2025-11-28', time: '09:21', location: '嚴島神社', text: '參觀嚴島神社', completed: false },
+                { id: 20, date: '2025-11-28', time: '11:29', location: '紅葉谷公園', text: '參觀紅葉谷公園', completed: false },
+                { id: 21, date: '2025-11-28', time: '12:47', location: 'JR Miyajima Ferry', text: '搭乘渡輪返回宮島口', completed: false },
+                { id: 22, date: '2025-11-28', time: '13:25', location: 'Takara', text: '午餐：Takara', completed: false },
+                { id: 23, date: '2025-11-28', time: '14:36', location: '廣島和平紀念資料館', text: '參觀資料館', completed: false },
+                { id: 24, date: '2025-11-28', time: '15:24', location: '廣島和平紀念公園', text: '參觀公園', completed: false },
+                { id: 25, date: '2025-11-28', time: '15:55', location: '原子彈爆炸圓頂屋', text: '參觀圓頂屋', completed: false },
+                { id: 26, date: '2025-11-28', time: '16:24', location: '廣島紙鶴塔', text: '參觀紙鶴塔', completed: false },
+                { id: 27, date: '2025-11-28', time: '17:11', location: '廣島城', text: '參觀廣島城', completed: false },
+                { id: 28, date: '2025-11-28', time: '18:06', location: 'BicCamera 廣島站前店', text: '購物', completed: false },
+                { id: 29, date: '2025-11-28', time: '19:31', location: '広島牡蠣処 大衆酒場バケツ 立町店', text: '晚餐：品嚐廣島牡蠣', completed: false },
+                { id: 30, date: '2025-11-28', time: '20:54', location: '廣島', text: '廣島站，準備返回岡山', completed: false },
+                { id: 31, date: '2025-11-28', time: '21:51', location: 'VIA INN 岡山', text: '回岡山飯店休息', completed: false },
 
-        // --- Firebase 初始化與全域函數定義 (不依賴 DOM) ---
+                // Day 3 (2025-11-29) - 岡山, 倉敷
+                { id: 32, date: '2025-11-29', time: '08:00', location: 'VIA INN 岡山', text: '飯店早餐/準備出發', completed: false },
+                { id: 33, date: '2025-11-29', time: '09:51', location: '吉備津神社', text: '參觀吉備津神社', completed: false },
+                { id: 34, date: '2025-11-29', time: '10:30', location: '吉備津彥神社', text: '參觀吉備津彥神社', completed: false },
+                { id: 35, date: '2025-11-29', time: '11:15', location: '創味魚菜 岩手川', text: '午餐：創味魚菜 岩手川', completed: false },
+                { id: 36, date: '2025-11-29', time: '12:18', location: '阿智神社', text: '參觀阿智神社', completed: false },
+                { id: 37, date: '2025-11-29', time: '13:25', location: '倉敷美觀地區', text: '漫步倉敷美觀地區', completed: false },
+                { id: 38, date: '2025-11-29', time: '14:27', location: '有鄰庵', text: '休息/點心：有鄰庵', completed: false },
+                { id: 39, date: '2025-11-29', time: '15:29', location: '倉敷桃子 總本店', text: '品嚐倉敷桃子甜點', completed: false },
+                { id: 40, date: '2025-11-29', time: '15:50', location: '三井OUTLET倉敷', text: '購物', completed: false },
+                { id: 41, date: '2025-11-29', time: '18:16', location: '岡山一番街', text: '逛岡山一番街', completed: false },
+                { id: 42, date: '2025-11-29', time: '19:22', location: 'Yakiniku dining Hachiya Honcho shop', text: '晚餐：燒肉', completed: false },
+                { id: 43, date: '2025-11-29', time: '20:26', location: '驚安の殿堂 唐吉訶德 岡山站前店', text: '購物', completed: false },
+                { id: 44, date: '2025-11-29', time: '21:35', location: 'VIA INN 岡山', text: '回飯店休息', completed: false },
 
-        // Firebase 服務實例 (Auth/Firestore/App 必須先定義)
-        try {
-            app = initializeApp(firebaseConfig);
-            db = getFirestore(app);
-            auth = getAuth(app);
-        } catch (e) {
-            console.error("Firebase 初始化失敗:", e);
-        }
-
-        const itineraryRef = () => doc(db, PUBLIC_COLLECTION_PATH, DOCUMENT_ID);
-
-        // 以下函數會被 DOMContentLoaded 內部的程式碼呼叫，需要傳入元素引用
-        function showMessageBar(messageBar, message, type = 'gray') {
-            if (!messageBar) return;
-            messageBar.textContent = message;
-            messageBar.className = `p-4 text-sm text-center border-t border-gray-100 block`;
-            
-            messageBar.classList.remove('bg-gray-50', 'bg-green-100', 'bg-red-100', 'bg-yellow-100', 'text-gray-600', 'text-green-800', 'text-red-800', 'text-yellow-800');
-
-            if (type === 'green') {
-                messageBar.classList.add('bg-green-100', 'text-green-800');
-            } else if (type === 'red') {
-                messageBar.classList.add('bg-red-100', 'text-red-800');
-            } else if (type === 'orange') {
-                messageBar.classList.add('bg-yellow-100', 'text-yellow-800');
-            } else {
-                messageBar.classList.add('bg-gray-50', 'text-gray-600');
-            }
-            
-            messageBar.classList.remove('hidden');
-            setTimeout(() => {
-                messageBar.classList.add('hidden');
-            }, 5000);
-        }
-
-        // 函數：控制單日行程的展開/收合
-        function toggleDay(index, renderFunction) {
-            const dayElement = document.getElementById(`day-${index}-content`);
-            if (dayElement) {
-                dayElement.classList.toggle('hidden');
-                itineraryData[index].expanded = !dayElement.classList.contains('hidden');
-            }
-            renderFunction(itineraryData); // 重新渲染以更新箭頭方向
-        }
-
-        // 函數：渲染整個行程列表 (需要引用 DOM 元素和 toggleDay 函數)
-        function renderItinerary(itineraryContainer, modalContent, modalContainer, currentData) {
-            if (!itineraryContainer) return;
-
-            itineraryContainer.innerHTML = ''; // 清空容器
-            
-            currentData.forEach((day, dayIndex) => {
-                const isExpanded = day.expanded;
+                // Day 4 (2025-11-30) - 岡山城, 尾道
+                { id: 45, date: '2025-11-30', time: '08:00', location: 'VIA INN 岡山', text: '飯店早餐/準備出發', completed: false },
+                { id: 46, date: '2025-11-30', time: '09:04', location: '岡山城', text: '參觀岡山城', completed: false },
+                { id: 47, date: '2025-11-30', time: '09:40', location: '岡山後樂園', text: '參觀日本三大名園', completed: false },
+                { id: 48, date: '2025-11-30', time: '10:37', location: '400℃ PIZZA モリノマチ (2号店)', text: '早午餐：披薩', completed: false },
+                { id: 49, date: '2025-11-30', time: '12:18', location: '尾道', text: '抵達尾道', completed: false },
+                { id: 50, date: '2025-11-30', time: '12:32', location: '駅前商店街 おのみち', text: '逛商店街', completed: false },
+                { id: 51, date: '2025-11-30', time: '12:51', location: 'Uminomieru Park', text: '海邊公園散步', completed: false },
+                { id: 52, date: '2025-11-30', time: '13:14', location: 'Karasawa Ice Cream', text: '品嚐 Karasawa 冰淇淋', completed: false },
+                { id: 53, date: '2025-11-30', time: '13:50', location: '千光寺山纜車 山麓站', text: '準備搭乘纜車', completed: false },
+                { id: 54, date: '2025-11-30', time: '14:15', location: '千光寺山纜車', text: '搭乘纜車上山', completed: false },
+                { id: 55, date: '2025-11-30', time: '14:16', location: '千光寺公園頂上展望台', text: '欣賞風景', completed: false },
+                { id: 56, date: '2025-11-30', time: '14:50', location: '千光寺', text: '參觀千光寺', completed: false },
+                { id: 57, date: '2025-11-30', time: '15:23', location: '鼓岩', text: '參觀鼓岩', completed: false },
+                { id: 58, date: '2025-11-30', time: '16:08', location: '貓之細道', text: '漫步貓之細道', completed: false },
+                { id: 59, date: '2025-11-30', time: '16:46', location: '尾道拉麵 壹番館本店', text: '晚餐：品嚐尾道拉麵', completed: false },
+                { id: 60, date: '2025-11-30', time: '17:57', location: '持光寺参道', text: '持光寺參道散步', completed: false },
+                { id: 61, date: '2025-11-30', time: '18:14', location: '尾道本通商店街', text: '逛商店街', completed: false },
+                { id: 62, date: '2025-11-30', time: '19:27', location: 'VIA INN 岡山', text: '回飯店休息', completed: false },
                 
-                const dayCard = document.createElement('div');
-                dayCard.className = 'bg-white border border-gray-200 rounded-2xl shadow-sm transition hover:shadow-md overflow-hidden';
+                // Day 5 (2025-12-01) - 嵐山, 大阪難波
+                { id: 63, date: '2025-12-01', time: '08:00', location: 'VIA INN 岡山', text: '退房，前往新大阪/京都', completed: false },
+                { id: 64, date: '2025-12-01', time: '10:24', location: '新大阪', text: '交通轉乘', completed: false },
+                { id: 65, date: '2025-12-01', time: '11:43', location: 'JR嵯峨嵐山站', text: '抵達嵯峨嵐山站', completed: false },
+                { id: 66, date: '2025-12-01', time: '11:58', location: '嵐山竹林小徑', text: '參觀竹林小徑', completed: false },
+                { id: 67, date: '2025-12-01', time: '13:11', location: '蕎麥麵 嵐山よしむら', text: '午餐：蕎麥麵', completed: false },
+                { id: 68, date: '2025-12-01', time: '14:17', location: 'Wagyu Volcano OAGARI, Arashiyama', text: '轉乘交通', completed: false },
+                { id: 69, date: '2025-12-01', time: '14:23', location: '渡月橋', text: '參觀渡月橋', completed: false },
+                { id: 70, date: '2025-12-01', time: '15:59', location: '京都八坂神社', text: '參觀八坂神社', completed: false },
+                { id: 71, date: '2025-12-01', time: '16:52', location: '京都站', text: '前往京都站，準備回大阪', completed: false },
+                { id: 72, date: '2025-12-01', time: '17:40', location: '新大阪', text: '返回新大阪', completed: false },
+                { id: 73, date: '2025-12-01', time: '18:19', location: '難波船舶旅館', text: '入住難波旅館', completed: false },
+                { id: 74, date: '2025-12-01', time: '19:13', location: '松島新地', text: '閒逛 (註: 此地點請自行斟酌)', completed: false },
+                { id: 75, date: '2025-12-01', time: '20:32', location: '道頓堀', text: '晚餐與夜景：道頓堀', completed: false },
+                { id: 76, date: '2025-12-01', time: '21:35', location: '唐吉訶德 道頓堀御堂筋店', text: '購物', completed: false },
+                { id: 77, date: '2025-12-01', time: '22:37', location: '難波船舶旅館', text: '回飯店休息', completed: false },
 
-                const header = document.createElement('button');
-                header.className = 'w-full flex justify-between items-center p-5 cursor-pointer bg-gray-50 hover:bg-gray-100 transition duration-150';
-                // 使用匿名函數來傳遞 renderItinerary 函數本身
-                header.onclick = () => toggleDay(dayIndex, (data) => renderItinerary(itineraryContainer, modalContent, modalContainer, data));
-                header.innerHTML = `
-                    <div class="flex items-center space-x-3">
-                        <span class="text-xl font-semibold text-indigo-700">${day.day}</span>
-                        <span class="text-sm font-medium text-gray-500">(${day.date})</span>
-                    </div>
-                    <svg class="w-5 h-5 text-gray-400 transform transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                    </svg>
-                `;
-                dayCard.appendChild(header);
+                // Day 6 (2025-12-02) - 大阪購物 (難波, 梅田)
+                { id: 78, date: '2025-12-02', time: '08:00', location: '難波船舶旅館', text: '飯店早餐/準備出發', completed: false },
+                { id: 79, date: '2025-12-02', time: '10:31', location: '高島屋 大阪店', text: '購物', completed: false },
+                { id: 80, date: '2025-12-02', time: '11:36', location: '難波丸井', text: '購物', completed: false },
+                { id: 81, date: '2025-12-02', time: '12:52', location: '美國村', text: '午餐與閒逛美國村', completed: false },
+                { id: 82, date: '2025-12-02', time: '14:10', location: 'LUCUA 1100', text: '梅田地區購物', completed: false },
+                { id: 83, date: '2025-12-02', time: '15:18', location: 'Hankyu Department Store Umeda Main Store', text: '購物', completed: false },
+                { id: 84, date: '2025-12-02', time: '16:21', location: '新梅田美食街', text: '小吃/休憩', completed: false },
+                { id: 85, date: '2025-12-02', time: '17:26', location: 'LINKS UMEDA', text: '購物', completed: false },
+                { id: 86, date: '2025-12-02', time: '18:29', location: 'Luck Rack LINKS UMEDA Store', text: '購物', completed: false },
+                { id: 87, date: '2025-12-02', time: '19:34', location: 'GRAND FRONT 大阪 北館', text: '晚餐與購物', completed: false },
+                { id: 88, date: '2025-12-02', time: '20:58', location: '心齋橋', text: '夜間購物', completed: false },
+                { id: 89, date: '2025-12-02', time: '22:13', location: '難波船舶旅館', text: '回飯店休息', completed: false },
 
-                const content = document.createElement('div');
-                content.id = `day-${dayIndex}-content`;
-                content.className = `p-4 space-y-3 border-t border-gray-100 ${isExpanded ? '' : 'hidden'}`;
+                // Day 7 (2025-12-03) - 大阪觀光
+                { id: 90, date: '2025-12-03', time: '08:00', location: '難波船舶旅館', text: '飯店早餐/準備出發', completed: false },
+                { id: 91, date: '2025-12-03', time: '11:08', location: '春駒壽司 本店', text: '午餐：春駒壽司', completed: false },
+                { id: 92, date: '2025-12-03', time: '12:29', location: '天神橋筋商店街', text: '逛日本最長商店街', completed: false },
+                { id: 93, date: '2025-12-03', time: '13:52', location: '四天王寺', text: '參觀四天王寺', completed: false },
+                { id: 94, date: '2025-12-03', time: '14:32', location: '堀越神社', text: '參觀堀越神社', completed: false },
+                { id: 95, date: '2025-12-03', time: '15:20', location: '飛田新地', text: '參觀/閒逛 (註: 此地點請自行斟酌)', completed: false },
+                { id: 96, date: '2025-12-03', time: '16:29', location: '通天閣', text: '參觀通天閣', completed: false },
+                { id: 97, date: '2025-12-03', time: '17:32', location: '新世界市場', text: '逛市場', completed: false },
+                { id: 98, date: '2025-12-03', time: '18:52', location: '天王寺公園', text: '散步/晚餐', completed: false },
+                { id: 99, date: '2025-12-03', time: '21:15', location: '驚安殿堂唐吉訶德難波千日前店', text: '購物', completed: false },
+                { id: 100, date: '2025-12-03', time: '22:27', location: '難波船舶旅館', text: '回飯店休息', completed: false },
+
+                // Day 8 (2025-12-04) - 臨空城, 返程
+                { id: 101, date: '2025-12-04', time: '08:00', location: '難波船舶旅館', text: '退房，準備前往機場', completed: false },
+                { id: 102, date: '2025-12-04', time: '11:57', location: '臨空城', text: '抵達臨空城', completed: false },
+                { id: 103, date: '2025-12-04', time: '12:10', location: 'りんくうプレミアム・アウトレット', text: '臨空城 Premium Outlet 購物/午餐', completed: false },
+                { id: 104, date: '2025-12-04', time: '14:58', location: '臨空城', text: '離開臨空城', completed: false },
+                { id: 105, date: '2025-12-04', time: '15:38', location: 'KIX·關西國際機場', text: '抵達關西國際機場，準備登機', completed: false },
+                { id: 106, date: '2025-12-04', time: '22:35', location: 'HKG·香港國際機場', text: '抵達香港國際機場', completed: false },
+            ];
+        }
+
+        /**
+         * 從 localStorage 載入行程列表。如果本地儲存中沒有資料，則載入預設行程。
+         * @returns {Array<Object>} 行程陣列。
+         */
+        function getTodos() {
+            try {
+                const data = localStorage.getItem(STORAGE_KEY);
+                if (data) {
+                    return JSON.parse(data);
+                } else {
+                    // 如果沒有儲存的資料，載入預設行程並儲存到本地
+                    const defaultItinerary = getDefaultItinerary();
+                    // 由於 saveTodos 會觸發 renderTodos，這裡不需要再次呼叫 renderTodos
+                    // 確保 saveTodos 函數在 getDefaultItinerary 之後定義，或者像下面這樣處理：
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultItinerary)); 
+                    return defaultItinerary;
+                }
+            } catch (error) {
+                console.error("載入行程失敗:", error);
+                return [];
+            }
+        }
+
+        /**
+         * 將行程列表儲存到 localStorage。
+         * @param {Array<Object>} todos - 行程陣列。
+         */
+        function saveTodos(todos) {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(todos));
+                // 儲存後立即重新渲染 UI
+                renderTodos(); 
+            } catch (error) {
+                console.error("儲存行程失敗:", error);
+                alertModal("錯誤", "無法儲存資料，本地儲存空間可能已滿。");
+            }
+        }
+
+        // --- 2. 應用程式功能邏輯 ---
+
+        /**
+         * 格式化日期字串為易讀格式 (MM/DD)。
+         * @param {string} dateString - YYYY-MM-DD 格式的日期字串。
+         * @returns {string} 格式化後的日期字串。
+         */
+        function formatDisplayDate(dateString) {
+            if (!dateString) return '未定日期';
+            const [year, month, day] = dateString.split('-');
+            const today = new Date().toISOString().slice(0, 10);
+            const isToday = dateString === today;
+            
+            return `${month}/${day}` + (isToday ? ' (今天)' : '');
+        }
+        
+        /**
+         * 嘗試打開地圖或連結。
+         * @param {string} location - 地點名稱或 URL。
+         */
+        function openMap(location) {
+            if (!location) {
+                alertModal("警告", "此行程沒有提供地點或連結。");
+                return;
+            }
+
+            let url = location.trim();
+            
+            // 檢查是否為有效的 URL
+            if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                // 如果不是 URL，則假設為地點名稱，使用 Google Maps 搜尋
+                url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`;
+            }
+
+            try {
+                window.open(url, '_blank');
+            } catch (e) {
+                 alertModal("錯誤", "無法打開連結，請檢查您的瀏覽器設定。");
+            }
+        }
+
+
+        /**
+         * 渲染行程列表到 UI 上。
+         */
+        function renderTodos() {
+            loadingMessageEl.style.display = 'none'; // 隱藏載入訊息
+            let todos = getTodos();
+            todoListContainer.innerHTML = ''; // 清空列表
+
+            // 排序：1. 按日期 (升序) 2. 按時間 (升序) 3. 未完成在前
+            todos.sort((a, b) => {
+                if (a.date < b.date) return -1;
+                if (a.date > b.date) return 1;
                 
-                day.events.forEach((event) => {
-                    const eventItem = document.createElement('div');
-                    
-                    const isShortStop = event.duration.includes('00時00分') || event.duration.includes('00時10分');
-                    const bgColor = isShortStop ? 'bg-indigo-50' : 'bg-white';
-                    const textColor = isShortStop ? 'text-indigo-700' : 'text-gray-800';
-                    const badgeColor = isShortStop ? 'text-indigo-500' : 'text-green-500';
+                if (a.time < b.time) return -1;
+                if (a.time > b.time) return 1;
 
-                    eventItem.className = `flex items-start p-3 rounded-xl border border-gray-100 shadow-sm ${bgColor} hover:shadow-md transition duration-150 cursor-pointer`;
-                    
-                    eventItem.innerHTML = `
-                        <div class="w-12 h-12 flex-shrink-0 flex items-center justify-center text-2xl rounded-full border-2 border-gray-200 mr-4">
-                            ${event.icon}
-                        </div>
-                        <div class="flex-grow">
-                            <p class="text-xs font-semibold uppercase tracking-wider text-gray-400">${event.time}</p>
-                            <h4 class="text-lg font-medium ${textColor} leading-tight">${event.location}</h4>
-                        </div>
-                        <div class="flex-shrink-0 ml-4 text-right">
-                            <span class="inline-flex items-center text-xs font-bold ${badgeColor}">
-                                <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                                ${event.duration.replace('時', 'h').replace('分', 'm')}
-                            </span>
-                        </div>
-                    `;
-                    
-                    eventItem.onclick = () => {
-                        if (modalContent && modalContainer) {
-                            modalContent.innerHTML = `
-                                <p><strong>地點:</strong> ${event.location}</p>
-                                <p><strong>時間:</strong> ${event.time}</p>
-                                <p><strong>停留時間:</strong> ${event.duration}</p>
-                                <p class="mt-4 text-sm text-gray-500">這是一個模擬詳情視窗。在真正的應用中，您可以編輯這些細節。</p>
-                            `;
-                            modalContainer.classList.remove('hidden');
-                        }
-                    };
-
-                    content.appendChild(eventItem);
-                });
-
-                dayCard.appendChild(content);
-                itineraryContainer.appendChild(dayCard);
+                return (a.completed === b.completed ? 0 : a.completed ? 1 : -1);
             });
-        }
-        
-        // 確保所有 DOM 元素準備就緒後才開始執行主邏輯
-        window.addEventListener('DOMContentLoaded', () => {
 
-            // 存取 DOM 元素
-            const authStatusElement = document.getElementById('auth-text');
-            const authIconElement = document.getElementById('auth-icon');
-            const loadBtn = document.getElementById('load-btn');
-            const saveBtn = document.getElementById('save-btn');
-            const itineraryContainer = document.getElementById('itinerary-container');
-            const messageBar = document.getElementById('message-bar');
-            const loadingSpinner = document.getElementById('loading-spinner');
-            const modalContainer = document.getElementById('modal-container');
-            const modalContent = document.getElementById('modal-content');
-            
-            // 由於 save/load 函數現在需要 messageBar 引用，我們將它們重新定義為閉包內的函數
-            
-            async function saveItinerary() {
-                if (!isAuthReady) {
-                    showMessageBar(messageBar, "請先等待認證完成。", 'red');
-                    return;
+            if (todos.length === 0) {
+                todoListContainer.innerHTML = `<p class="text-center text-gray-500 p-6 border-2 border-dashed border-purple-300 rounded-xl">
+                    <span class="text-2xl block mb-2">🎉</span>
+                    您的行程清單是空的！現在就開始規劃您的下一段旅程吧。
+                    </p>`;
+                return;
+            }
+
+            // 使用 Map 根據日期分組行程
+            const groupedTodos = todos.reduce((acc, todo) => {
+                const dateKey = todo.date || '無日期';
+                if (!acc[dateKey]) {
+                    acc[dateKey] = [];
                 }
-                saveBtn.disabled = true;
+                acc[dateKey].push(todo);
+                return acc;
+            }, {});
 
-                try {
-                    const dataToSave = {
-                        itinerary: itineraryData.map(day => ({
-                            day: day.day,
-                            date: day.date,
-                            expanded: day.expanded,
-                            events: day.events
-                        })),
-                        updatedAt: new Date().toISOString(),
-                        updatedBy: userId
-                    };
+            // 渲染分組後的行程
+            for (const dateKey in groupedTodos) {
+                const dateHeader = document.createElement('div');
+                const isPast = dateKey < today;
+                const isToday = dateKey === today;
+
+                dateHeader.className = `sticky top-0 z-10 p-3 rounded-lg font-extrabold text-white shadow-md transition duration-300 ${isPast ? 'bg-gray-500' : isToday ? 'bg-indigo-500' : 'bg-purple-600'}`;
+                
+                dateHeader.innerHTML = `<span class="text-xl">${formatDisplayDate(dateKey)}</span> <span class="text-sm font-normal ml-2">${isPast ? '(已過期)' : isToday ? '(今日焦點)' : ''}</span>`;
+                todoListContainer.appendChild(dateHeader);
+
+                groupedTodos[dateKey].forEach(todo => {
+                    const todoItem = document.createElement('div');
+                    const isCompleted = todo.completed;
+
+                    todoItem.className = `flex flex-col sm:flex-row items-start sm:items-center justify-between p-5 rounded-xl border-l-4 my-3 transition duration-150 ease-in-out cursor-pointer ${isCompleted ? 'bg-green-50 border-green-400 text-gray-500 opacity-70' : 'bg-white border-purple-400 hover:shadow-lg'}`;
                     
-                    await setDoc(itineraryRef(), dataToSave);
-                    showMessageBar(messageBar, "行程已成功儲存到雲端！", 'green');
-                } catch (error) {
-                    console.error("儲存行程失敗:", error);
-                    showMessageBar(messageBar, "儲存行程失敗：" + error.message, 'red');
-                } finally {
-                    saveBtn.disabled = false;
-                }
-            }
+                    const contentArea = document.createElement('div');
+                    contentArea.className = 'flex-grow mb-3 sm:mb-0';
+                    
+                    // 時間和地點
+                    const metaData = document.createElement('div');
+                    metaData.className = 'text-sm mb-1 space-x-4 flex items-center';
+                    metaData.innerHTML = `
+                        <span class="font-mono text-purple-600 ${isCompleted ? 'text-gray-400' : ''}">
+                            <svg class="w-4 h-4 inline mr-1 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            ${todo.time || '全天'}
+                        </span>
+                        ${todo.location ? `<span class="text-gray-500 ${isCompleted ? 'text-gray-400' : ''} flex items-center">
+                            <svg class="w-4 h-4 inline mr-1 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                            ${todo.location}
+                        </span>` : ''}
+                    `;
+                    contentArea.appendChild(metaData);
 
-            async function loadItinerary() {
-                if (!isAuthReady) {
-                    showMessageBar(messageBar, "請先等待認證完成。", 'red');
-                    return;
-                }
-                loadBtn.disabled = true;
+                    // 行程內容
+                    const mainText = document.createElement('p');
+                    mainText.className = `text-lg font-medium ${isCompleted ? 'line-through text-gray-500' : 'text-gray-800'}`;
+                    mainText.textContent = todo.text;
+                    contentArea.appendChild(mainText);
 
-                try {
-                    const docSnap = await getDoc(itineraryRef());
-                    if (docSnap.exists()) {
-                        const data = docSnap.data();
-                        if (data && data.itinerary) {
-                            itineraryData = data.itinerary;
-                            renderItinerary(itineraryContainer, modalContent, modalContainer, itineraryData);
-                            showMessageBar(messageBar, "行程已從雲端載入。", 'green');
-                        } else {
-                            showMessageBar(messageBar, "雲端文件內容無效。", 'red');
-                        }
-                    } else {
-                        showMessageBar(messageBar, "雲端找不到儲存的行程，將使用初始數據。", 'orange');
-                        renderItinerary(itineraryContainer, modalContent, modalContainer, itineraryData);
-                    }
-                } catch (error) {
-                    console.error("載入行程失敗:", error);
-                    showMessageBar(messageBar, "載入行程失敗：" + error.message, 'red');
-                } finally {
-                    loadBtn.disabled = false;
-                }
-            }
-            
-            // 綁定事件監聽器
-            if (loadBtn) loadBtn.addEventListener('click', loadItinerary);
-            if (saveBtn) saveBtn.addEventListener('click', saveItinerary);
+                    todoItem.appendChild(contentArea);
+                    
+                    // 按鈕容器
+                    const buttonGroup = document.createElement('div');
+                    buttonGroup.className = 'flex space-x-2 flex-shrink-0';
+                    
+                    // 導航按鈕
+                    const navigateBtn = document.createElement('button');
+                    navigateBtn.innerHTML = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l4-4m4 4l4-4m-4 4V5a2 2 0 00-2-2h-2a2 2 0 00-2 2v10m-2 4h4"></path></svg>`;
+                    navigateBtn.title = '前往導航/連結';
+                    navigateBtn.className = 'p-2 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-md transition duration-150';
+                    navigateBtn.addEventListener('click', (e) => {
+                        e.stopPropagation(); // 防止點擊事件影響父元素（完成切換）
+                        openMap(todo.location);
+                    });
 
+                    // 完成按鈕
+                    const completeBtn = document.createElement('button');
+                    completeBtn.innerHTML = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${isCompleted ? 'M6 18L18 6M6 6l12 12' : 'M5 13l4 4L19 7'}"></path></svg>`;
+                    completeBtn.title = isCompleted ? '標記為未完成' : '標記為完成';
+                    completeBtn.className = `p-2 rounded-full ${isCompleted ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'} text-white shadow-md transition duration-150`;
+                    completeBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        toggleComplete(todo.id);
+                    });
 
-            // 1. 處理認證
-            if (auth) {
-                onAuthStateChanged(auth, async (user) => {
-                    try {
-                        if (user) {
-                            userId = user.uid;
-                            if (authIconElement) authIconElement.classList.replace('text-gray-400', 'text-green-500');
-                            if (authStatusElement) authStatusElement.textContent = `已驗證使用者 (${userId.substring(0, 8)}...)`;
-                            isAuthReady = true;
-                        } else if (initialAuthToken) {
-                            await signInWithCustomToken(auth, initialAuthToken);
-                            // onAuthStateChanged 會再次觸發
-                        } else {
-                            await signInAnonymously(auth);
-                            // onAuthStateChanged 會再次觸發
-                        }
-                    } catch (error) {
-                        console.error("Firebase 認證失敗:", error);
-                        if (authIconElement) authIconElement.classList.replace('text-gray-400', 'text-red-500');
-                        if (authStatusElement) authStatusElement.textContent = "認證失敗 (匿名)";
-                        isAuthReady = true;
-                    }
+                    // 刪除按鈕
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.innerHTML = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>`;
+                    deleteBtn.title = '刪除行程';
+                    deleteBtn.className = 'p-2 rounded-full bg-gray-400 hover:bg-gray-500 text-white shadow-md transition duration-150';
+                    deleteBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        deleteTodo(todo.id);
+                    });
 
-                    if (isAuthReady) {
-                        if (loadBtn) loadBtn.disabled = false;
-                        if (saveBtn) saveBtn.disabled = false;
-                        
-                        // 在認證準備就緒後，渲染初始數據並開始監聽
-                        renderItinerary(itineraryContainer, modalContent, modalContainer, itineraryData);
-                        if (loadingSpinner) loadingSpinner.classList.add('hidden');
-                        
-                        // 2. 設定即時監聽 (Optional for this public doc, but good practice)
-                        setupSnapshotListener(itineraryContainer, modalContent, modalContainer, messageBar);
-                    }
-                });
-            } else {
-                // 如果 Firebase 初始化失敗 (app/db/auth 為 null)
-                if (authStatusElement) authStatusElement.textContent = "Firebase 服務無法使用";
-                if (loadingSpinner) loadingSpinner.classList.add('hidden');
-            }
-            
-            function setupSnapshotListener(itineraryContainer, modalContent, modalContainer, messageBar) {
-                if (!isAuthReady) return;
-
-                // 即時監聽公共行程文件的變更
-                onSnapshot(itineraryRef(), (docSnapshot) => {
-                    if (docSnapshot.exists()) {
-                        const data = docSnapshot.data();
-                        if (data && data.itinerary) {
-                            itineraryData = data.itinerary;
-                            renderItinerary(itineraryContainer, modalContent, modalContainer, itineraryData);
-                            showMessageBar(messageBar, "行程已從雲端即時更新。", 'green');
-                        }
-                    } else {
-                        // 如果文件不存在，確保使用本地數據
-                        console.log("雲端行程文件不存在，使用本地初始數據。");
-                        renderItinerary(itineraryContainer, modalContent, modalContainer, itineraryData);
-                    }
-                }, (error) => {
-                    console.error("設定 Firestore 監聽失敗:", error);
-                    showMessageBar(messageBar, "無法監聽雲端行程更新。", 'red');
+                    if(todo.location) buttonGroup.appendChild(navigateBtn);
+                    buttonGroup.appendChild(completeBtn);
+                    buttonGroup.appendChild(deleteBtn);
+                    
+                    todoItem.appendChild(buttonGroup);
+                    todoListContainer.appendChild(todoItem);
                 });
             }
-        });
-        
+        }
+
+        /**
+         * 新增行程。
+         */
+        function addTodo() {
+            const text = newTodoTextEl.value.trim();
+            const date = newTodoDateEl.value; 
+            const time = newTodoTimeEl.value;
+            const location = newTodoLocationEl.value.trim();
+
+            if (text === '') return alertModal("警告", "行程內容不能為空！");
+            if (date === '') return alertModal("警告", "請選擇行程日期！");
+
+            addTodoBtn.disabled = true;
+            addTodoBtn.innerHTML = '<span class="animate-pulse">儲存中...</span>';
+
+            const todos = getTodos();
+            const newTodo = {
+                id: Date.now(), 
+                text: text,
+                date: date,
+                time: time,
+                location: location,
+                completed: false
+            };
+
+            todos.push(newTodo);
+            saveTodos(todos); 
+            
+            // 清空內容和地點，日期和時間保持不變方便連續輸入
+            newTodoTextEl.value = ''; 
+            newTodoLocationEl.value = '';
+
+            addTodoBtn.innerHTML = '<svg class="w-5 h-5 inline mr-1 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>新增';
+            addTodoBtn.disabled = false;
+        }
+
+        /**
+         * 切換行程的完成狀態。
+         */
+        function toggleComplete(id) {
+            const todos = getTodos();
+            const index = todos.findIndex(todo => todo.id === id);
+
+            if (index !== -1) {
+                todos[index].completed = !todos[index].completed;
+                saveTodos(todos);
+            }
+        }
+
+        /**
+         * 刪除行程。
+         */
+        function deleteTodo(id) {
+            // 由於禁止使用 confirm()，這裡仍使用 window.confirm 作為快速提示
+            if (window.confirm("確定要永久刪除此行程嗎？")) { 
+                const todos = getTodos();
+                const filteredTodos = todos.filter(todo => todo.id !== id);
+                saveTodos(filteredTodos);
+            }
+        }
+
+        // --- 3. UI 輔助函數 ---
+
+        /**
+         * 客製化模態框替代 alert/confirm。
+         */
+        function alertModal(title, message) {
+            const existingModal = document.getElementById('custom-alert-modal');
+            if (existingModal) existingModal.remove();
+
+            const modalHtml = `
+                <div id="custom-alert-modal" class="fixed inset-0 bg-gray-900 bg-opacity-80 flex items-center justify-center z-50 p-4">
+                    <div class="bg-white rounded-xl p-8 shadow-2xl max-w-sm w-full transform transition-all duration-300 scale-100">
+                        <h2 class="text-2xl font-bold mb-3 ${title.includes('警告') ? 'text-yellow-600' : 'text-red-600'}">${title}</h2>
+                        <p class="text-gray-700 mb-6">${message}</p>
+                        <button onclick="document.getElementById('custom-alert-modal').remove()" 
+                                class="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 rounded-lg transition duration-150 shadow-md">
+                            明白了
+                        </button>
+                    </div>
+                </div>
+            `;
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+        }
+
+        // --- 4. 啟動應用程式 ---
+        window.onload = function () {
+            // 初始載入和渲染資料
+            renderTodos();
+
+            // 事件監聽器
+            addTodoBtn.addEventListener('click', addTodo);
+            newTodoTextEl.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    addTodo();
+                }
+            });
+        };
+
     </script>
 </body>
 </html>
