@@ -2,732 +2,497 @@
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>2025 日本關西/山陽之旅 (自動尋圖修正版)</title>
-    
-    <!-- React & ReactDOM -->
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    
-    <!-- Babel for JSX -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    
-    <!-- Tailwind CSS -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>互動式行程規劃器</title>
+    <!-- 載入 Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Phosphor Icons (Lightweight icons) -->
-    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- 使用 Inter 字體 -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f9fb; /* Light background for a clean vibe */
+        }
+        /* Custom scrollbar for aesthetics */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background-color: #cbd5e1;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-8">
 
-    <!-- Google Fonts: Noto Sans TC -->
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
-    
-    <!-- Firebase Imports -->
+    <div id="app" class="max-w-4xl mx-auto bg-white rounded-3xl shadow-xl overflow-hidden">
+        
+        <!-- Header -->
+        <header class="p-6 bg-indigo-600 text-white shadow-lg">
+            <h1 class="text-3xl font-bold tracking-tight">
+                山陽與關西 8 日之旅
+            </h1>
+            <p class="text-indigo-200 mt-1">互動式行程規劃與儲存</p>
+        </header>
+
+        <!-- Control Panel -->
+        <div class="p-6 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-3 sm:space-y-0">
+            <div id="auth-status" class="text-sm text-gray-600 flex items-center space-x-2">
+                <svg id="auth-icon" class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <span id="auth-text">初始化驗證...</span>
+            </div>
+            <div class="flex space-x-3">
+                <button id="load-btn" class="px-4 py-2 bg-green-500 text-white text-sm font-medium rounded-xl shadow hover:bg-green-600 transition duration-150 flex items-center disabled:opacity-50" disabled>
+                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    載入行程
+                </button>
+                <button id="save-btn" class="px-4 py-2 bg-indigo-500 text-white text-sm font-medium rounded-xl shadow hover:bg-indigo-600 transition duration-150 flex items-center disabled:opacity-50" disabled>
+                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
+                    儲存行程
+                </button>
+            </div>
+        </div>
+
+        <!-- Itinerary List -->
+        <div id="itinerary-container" class="p-4 sm:p-6 space-y-4">
+            <!-- Itinerary days will be rendered here -->
+            <div class="text-center py-10 text-gray-500" id="loading-spinner">載入中...</div>
+        </div>
+        
+        <!-- Footer / Message Bar -->
+        <div id="message-bar" class="p-4 bg-gray-50 text-sm text-center text-gray-600 border-t border-gray-100 hidden">
+            行程已成功儲存/載入。
+        </div>
+
+        <!-- Modal for Itinerary Details (Not fully implemented, but structure is here) -->
+        <div id="modal-container" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+            <div class="bg-white rounded-2xl p-6 w-full max-w-lg shadow-2xl">
+                <h3 class="text-xl font-bold mb-4">事件詳情</h3>
+                <p id="modal-content"></p>
+                <button onclick="document.getElementById('modal-container').classList.add('hidden')" class="mt-4 px-4 py-2 bg-red-500 text-white rounded-xl hover:bg-red-600">關閉</button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Firebase SDKs -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, onSnapshot, collection, query, setDoc, deleteDoc, runTransaction, getDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // IMPORTANT: Global variables provided by the environment
+        // 設定 Firestore 偵錯日誌
+        setLogLevel('Debug');
+
+        // 全域變數，從 Canvas 環境提供
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
         const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
-        if (Object.keys(firebaseConfig).length > 0) {
-            setLogLevel('debug'); // Enable debug logging for Firebase
-            window.firebaseApp = initializeApp(firebaseConfig);
-            window.db = getFirestore(window.firebaseApp);
-            window.auth = getAuth(window.firebaseApp);
+        // Firebase 服務實例
+        let app, db, auth;
+        let userId = null;
+        let isAuthReady = false;
 
-            // --- FIX: Expose necessary Firebase functions to global scope for React ---
-            window.onAuthStateChanged = onAuthStateChanged;
-            window.collection = collection;
-            window.onSnapshot = onSnapshot;
-            window.doc = doc;
-            window.setDoc = setDoc;
-            window.deleteDoc = deleteDoc;
-            window.getDocs = getDocs; 
-            // --------------------------------------------------------------------------
+        const PUBLIC_COLLECTION_PATH = `/artifacts/${appId}/public/data/itineraries`;
+        const DOCUMENT_ID = 'main-trip'; // 用於儲存和載入行程的固定文件 ID
 
-            // Authentication logic
-            onAuthStateChanged(window.auth, async (user) => {
-                if (!user) {
-                    try {
-                        if (initialAuthToken) {
-                            await signInWithCustomToken(window.auth, initialAuthToken);
+        // 初始行程數據
+        let itineraryData = [
+            { day: "第1天", date: "2025/11/27", expanded: true, events: [
+                { time: "00:50", location: "HKG·香港國際機場", duration: "01時00分", icon: "✈️" },
+                { time: "06:20", location: "KIX·關西國際機場", duration: "01時00分", icon: "✈️" },
+                { time: "08:25", location: "JR三宮站", duration: "00時20分", icon: "🚆" },
+                { time: "09:02", location: "新神戶", duration: "00時25分", icon: "🚆" },
+                { time: "09:53", location: "姬路", duration: "00時00分", icon: "🚶" },
+                { time: "10:19", location: "姬路城", duration: "01時30分", icon: "🏰" },
+                { time: "12:05", location: "好古園", duration: "00時30分", icon: "🌳" },
+                { time: "12:43", location: "神戶牛串燒 Kushiyaki Kobe beef", duration: "01時00分", icon: "🥩" },
+                { time: "14:39", location: "美利堅公園", duration: "00時30分", icon: "🚢" },
+                { time: "15:21", location: "神戶臨海樂園 umie", duration: "02時30分", icon: "🛍️" },
+                { time: "18:07", location: "JR三宮站", duration: "00時20分", icon: "🚆" },
+                { time: "19:10", location: "VIA INN 岡山", duration: "00時20分", icon: "🏨" },
+                { time: "19:41", location: "永旺夢樂城 岡山", duration: "01時00分", icon: "🛒" },
+                { time: "20:47", location: "Tan-ya Bizen (Aeon Mall Okayama)", duration: "01時00分", icon: "🍽️" },
+                { time: "21:59", location: "VIA INN 岡山", duration: "01時00分", icon: "🛌" },
+            ]},
+            { day: "第2天", date: "2025/11/28", expanded: false, events: [
+                { time: "06:00", location: "VIA INN 岡山", duration: "01時15分", icon: "⏰" },
+                { time: "08:30", location: "宮島口", duration: "00時00分", icon: "🚢" },
+                { time: "08:33", location: "JR Miyajima Ferry", duration: "00時10分", icon: "⛴️" },
+                { time: "09:21", location: "嚴島神社", duration: "02時00分", icon: "⛩️" },
+                { time: "11:29", location: "紅葉谷公園", duration: "00時40分", icon: "🍁" },
+                { time: "12:47", location: "JR Miyajima Ferry", duration: "00時00分", icon: "⛴️" },
+                { time: "13:25", location: "Takara", duration: "01時00分", icon: "🍽️" },
+                { time: "14:36", location: "廣島和平紀念資料館", duration: "00時45分", icon: "🏛️" },
+                { time: "15:24", location: "廣島和平紀念公園", duration: "00時25分", icon: "🌳" },
+                { time: "15:55", location: "原子彈爆炸圓頂屋", duration: "00時25分", icon: "💀" },
+                { time: "16:24", location: "廣島紙鶴塔", duration: "00時35分", icon: "🗼" },
+                { time: "17:11", location: "廣島城", duration: "00時30分", icon: "🏰" },
+                { time: "18:06", location: "BicCamera 廣島站前店", duration: "01時00分", icon: "📸" },
+                { time: "19:31", location: "広島牡蠣処 大衆酒場バケツ 立町店", duration: "01時00分", icon: "🦪" },
+                { time: "20:54", location: "廣島", duration: "00時10分", icon: "🚆" },
+                { time: "21:51", location: "VIA INN 岡山", duration: "01時00分", icon: "🛌" },
+            ]},
+            { day: "第3天", date: "2025/11/29", expanded: false, events: [
+                { time: "08:00", location: "VIA INN 岡山", duration: "01時30分", icon: "⏰" },
+                { time: "09:51", location: "吉備津神社", duration: "00時30分", icon: "⛩️" },
+                { time: "10:30", location: "吉備津彥神社", duration: "00時30分", icon: "⛩️" },
+                { time: "11:15", location: "創味魚菜 岩手川", duration: "00時45分", icon: "🍽️" },
+                { time: "12:18", location: "阿智神社", duration: "01時00分", icon: "⛩️" },
+                { time: "13:25", location: "倉敷美觀地區", duration: "01時00分", icon: "🏘️" },
+                { time: "14:27", location: "有鄰庵", duration: "01時00分", icon: "☕" },
+                { time: "15:29", location: "倉敷桃子 總本店", duration: "00時00分", icon: "🍑" },
+                { time: "15:50", location: "三井OUTLET倉敷", duration: "02時00分", icon: "🛍️" },
+                { time: "18:16", location: "岡山一番街", duration: "01時00分", icon: "🛒" },
+                { time: "19:22", location: "Yakiniku dining Hachiya Honcho shop", duration: "01時00分", icon: "🥩" },
+                { time: "20:26", location: "驚安の殿堂 唐吉訶德 岡山站前店", duration: "01時00分", icon: "🛒" },
+                { time: "21:35", location: "VIA INN 岡山", duration: "01時00分", icon: "🛌" },
+            ]},
+            { day: "第4天", date: "2025/11/30", expanded: false, events: [
+                { time: "08:00", location: "VIA INN 岡山", duration: "00時45分", icon: "⏰" },
+                { time: "09:04", location: "岡山城", duration: "00時30分", icon: "🏰" },
+                { time: "09:40", location: "岡山後樂園", duration: "00時30分", icon: "🌳" },
+                { time: "10:37", location: "400℃ PIZZA モリノマチ (2号店)", duration: "00時45分", icon: "🍕" },
+                { time: "12:18", location: "尾道", duration: "00時10分", icon: "🚆" },
+                { time: "12:32", location: "駅前商店街 おのみち", duration: "00時15分", icon: "🛍️" },
+                { time: "12:51", location: "Uminomieru Park", duration: "00時20分", icon: "🏞️" },
+                { time: "13:14", location: "Karasawa Ice Cream", duration: "00時25分", icon: "🍦" },
+                { time: "13:50", location: "千光寺山纜車 山麓站", duration: "00時10分", icon: "🚠" },
+                { time: "14:15", location: "千光寺山纜車", duration: "00時00分", icon: "🚠" },
+                { time: "14:16", location: "千光寺公園頂上展望台", duration: "00時30分", icon: "🔭" },
+                { time: "14:50", location: "千光寺", duration: "00時30分", icon: "🙏" },
+                { time: "15:23", location: "鼓岩", duration: "00時30分", icon: "🪨" },
+                { time: "16:08", location: "貓之細道", duration: "00時30分", icon: "🐈" },
+                { time: "16:46", location: "尾道拉麵 壹番館本店", duration: "01時00分", icon: "🍜" },
+                { time: "17:57", location: "持光寺参道", duration: "00時15分", icon: "🙏" },
+                { time: "18:14", location: "尾道本通商店街", duration: "00時30分", icon: "🛍️" },
+                { time: "19:27", location: "VIA INN 岡山", duration: "01時00分", icon: "🛌" },
+            ]},
+            { day: "第5天", date: "2025/12/01", expanded: false, events: [
+                { time: "08:00", location: "VIA INN 岡山", duration: "01時30分", icon: "⏰" },
+                { time: "10:24", location: "新大阪", duration: "00時30分", icon: "🚆" },
+                { time: "11:43", location: "JR嵯峨嵐山站", duration: "00時00分", icon: "🚆" },
+                { time: "11:58", location: "嵐山竹林小徑", duration: "01時00分", icon: "🎍" },
+                { time: "13:11", location: "蕎麥麵 嵐山よしむら", duration: "01時00分", icon: "🍜" },
+                { time: "14:17", location: "Wagyu Volcano OAGARI, Arashiyama", duration: "00時00分", icon: "🥩" },
+                { time: "14:23", location: "渡月橋", duration: "01時00分", icon: "🌉" },
+                { time: "15:59", location: "京都八坂神社", duration: "00時30分", icon: "⛩️" },
+                { time: "16:52", location: "京都站", duration: "00時10分", icon: "🚆" },
+                { time: "17:40", location: "新大阪", duration: "00時15分", icon: "🚆" },
+                { time: "18:19", location: "難波船舶旅館", duration: "00時35分", icon: "🏨" },
+                { time: "19:13", location: "松島新地", duration: "01時00分", icon: "🌃" },
+                { time: "20:32", location: "道頓堀", duration: "01時00分", icon: "🦀" },
+                { time: "21:35", location: "唐吉訶德 道頓堀御堂筋店", duration: "01時00分", icon: "🛒" },
+                { time: "22:37", location: "難波船舶旅館", duration: "01時00分", icon: "🛌" },
+            ]},
+            { day: "第6天", date: "2025/12/02", expanded: false, events: [
+                { time: "08:00", location: "難波船舶旅館", duration: "02時20分", icon: "⏰" },
+                { time: "10:31", location: "高島屋 大阪店", duration: "01時00分", icon: "🛍️" },
+                { time: "11:36", location: "難波丸井", duration: "01時00分", icon: "🛍️" },
+                { time: "12:52", location: "美國村", duration: "01時00分", icon: "👕" },
+                { time: "14:10", location: "LUCUA 1100", duration: "01時00分", icon: "🛍️" },
+                { time: "15:18", location: "Hankyu Department Store Umeda Main Store", duration: "01時00分", icon: "🛍️" },
+                { time: "16:21", location: "新梅田美食街", duration: "01時00分", icon: "🍽️" },
+                { time: "17:26", location: "LINKS UMEDA", duration: "01時00分", icon: "🛍️" },
+                { time: "18:29", location: "Luck Rack LINKS UMEDA Store", duration: "01時00分", icon: "🛍️" },
+                { time: "19:34", location: "GRAND FRONT 大阪 北館", duration: "01時00分", icon: "🛍️" },
+                { time: "20:58", location: "心齋橋", duration: "01時00分", icon: "🛍️" },
+                { time: "22:13", location: "難波船舶旅館", duration: "01時00分", icon: "🛌" },
+            ]},
+            { day: "第7天", date: "2025/12/03", expanded: false, events: [
+                { time: "08:00", location: "難波船舶旅館", duration: "02時30分", icon: "⏰" },
+                { time: "11:08", location: "春駒壽司 本店", duration: "01時00分", icon: "🍣" },
+                { time: "12:29", location: "天神橋筋商店街", duration: "01時00分", icon: "🛍️" },
+                { time: "13:52", location: "四天王寺", duration: "00時30分", icon: "🙏" },
+                { time: "14:32", location: "堀越神社", duration: "00時30分", icon: "⛩️" },
+                { time: "15:20", location: "飛田新地", duration: "01時00分", icon: "🌃" },
+                { time: "16:29", location: "通天閣", duration: "01時00分", icon: "🗼" },
+                { time: "17:32", location: "新世界市場", duration: "01時00分", icon: "🛍️" },
+                { time: "18:52", location: "天王寺公園", duration: "02時00分", icon: "🌳" },
+                { time: "21:15", location: "驚安殿堂唐吉訶德難波千日前店", duration: "01時00分", icon: "🛒" },
+                { time: "22:27", location: "難波船舶旅館", duration: "01時00分", icon: "🛌" },
+            ]},
+            { day: "第8天", date: "2025/12/04", expanded: false, events: [
+                { time: "08:00", location: "難波船舶旅館", duration: "03時00分", icon: "⏰" },
+                { time: "11:57", location: "臨空城", duration: "00時00分", icon: "🚆" },
+                { time: "12:10", location: "りんくうプレミアム・アウトレット", duration: "02時35分", icon: "🛍️" },
+                { time: "14:58", location: "臨空城", duration: "00時10分", icon: "🚆" },
+                { time: "15:38", location: "KIX·關西國際機場", duration: "02時27分", icon: "✈️" },
+                { time: "22:35", location: "HKG·香港國際機場", duration: "00時00分", icon: "🏠" },
+            ]},
+        ];
+
+        // --- Firebase 初始化與全域函數定義 (不依賴 DOM) ---
+
+        // Firebase 服務實例 (Auth/Firestore/App 必須先定義)
+        try {
+            app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            auth = getAuth(app);
+        } catch (e) {
+            console.error("Firebase 初始化失敗:", e);
+        }
+
+        const itineraryRef = () => doc(db, PUBLIC_COLLECTION_PATH, DOCUMENT_ID);
+
+        // 以下函數會被 DOMContentLoaded 內部的程式碼呼叫，需要傳入元素引用
+        function showMessageBar(messageBar, message, type = 'gray') {
+            if (!messageBar) return;
+            messageBar.textContent = message;
+            messageBar.className = `p-4 text-sm text-center border-t border-gray-100 block`;
+            
+            messageBar.classList.remove('bg-gray-50', 'bg-green-100', 'bg-red-100', 'bg-yellow-100', 'text-gray-600', 'text-green-800', 'text-red-800', 'text-yellow-800');
+
+            if (type === 'green') {
+                messageBar.classList.add('bg-green-100', 'text-green-800');
+            } else if (type === 'red') {
+                messageBar.classList.add('bg-red-100', 'text-red-800');
+            } else if (type === 'orange') {
+                messageBar.classList.add('bg-yellow-100', 'text-yellow-800');
+            } else {
+                messageBar.classList.add('bg-gray-50', 'text-gray-600');
+            }
+            
+            messageBar.classList.remove('hidden');
+            setTimeout(() => {
+                messageBar.classList.add('hidden');
+            }, 5000);
+        }
+
+        // 函數：控制單日行程的展開/收合
+        function toggleDay(index, renderFunction) {
+            const dayElement = document.getElementById(`day-${index}-content`);
+            if (dayElement) {
+                dayElement.classList.toggle('hidden');
+                itineraryData[index].expanded = !dayElement.classList.contains('hidden');
+            }
+            renderFunction(itineraryData); // 重新渲染以更新箭頭方向
+        }
+
+        // 函數：渲染整個行程列表 (需要引用 DOM 元素和 toggleDay 函數)
+        function renderItinerary(itineraryContainer, modalContent, modalContainer, currentData) {
+            if (!itineraryContainer) return;
+
+            itineraryContainer.innerHTML = ''; // 清空容器
+            
+            currentData.forEach((day, dayIndex) => {
+                const isExpanded = day.expanded;
+                
+                const dayCard = document.createElement('div');
+                dayCard.className = 'bg-white border border-gray-200 rounded-2xl shadow-sm transition hover:shadow-md overflow-hidden';
+
+                const header = document.createElement('button');
+                header.className = 'w-full flex justify-between items-center p-5 cursor-pointer bg-gray-50 hover:bg-gray-100 transition duration-150';
+                // 使用匿名函數來傳遞 renderItinerary 函數本身
+                header.onclick = () => toggleDay(dayIndex, (data) => renderItinerary(itineraryContainer, modalContent, modalContainer, data));
+                header.innerHTML = `
+                    <div class="flex items-center space-x-3">
+                        <span class="text-xl font-semibold text-indigo-700">${day.day}</span>
+                        <span class="text-sm font-medium text-gray-500">(${day.date})</span>
+                    </div>
+                    <svg class="w-5 h-5 text-gray-400 transform transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                `;
+                dayCard.appendChild(header);
+
+                const content = document.createElement('div');
+                content.id = `day-${dayIndex}-content`;
+                content.className = `p-4 space-y-3 border-t border-gray-100 ${isExpanded ? '' : 'hidden'}`;
+                
+                day.events.forEach((event) => {
+                    const eventItem = document.createElement('div');
+                    
+                    const isShortStop = event.duration.includes('00時00分') || event.duration.includes('00時10分');
+                    const bgColor = isShortStop ? 'bg-indigo-50' : 'bg-white';
+                    const textColor = isShortStop ? 'text-indigo-700' : 'text-gray-800';
+                    const badgeColor = isShortStop ? 'text-indigo-500' : 'text-green-500';
+
+                    eventItem.className = `flex items-start p-3 rounded-xl border border-gray-100 shadow-sm ${bgColor} hover:shadow-md transition duration-150 cursor-pointer`;
+                    
+                    eventItem.innerHTML = `
+                        <div class="w-12 h-12 flex-shrink-0 flex items-center justify-center text-2xl rounded-full border-2 border-gray-200 mr-4">
+                            ${event.icon}
+                        </div>
+                        <div class="flex-grow">
+                            <p class="text-xs font-semibold uppercase tracking-wider text-gray-400">${event.time}</p>
+                            <h4 class="text-lg font-medium ${textColor} leading-tight">${event.location}</h4>
+                        </div>
+                        <div class="flex-shrink-0 ml-4 text-right">
+                            <span class="inline-flex items-center text-xs font-bold ${badgeColor}">
+                                <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                ${event.duration.replace('時', 'h').replace('分', 'm')}
+                            </span>
+                        </div>
+                    `;
+                    
+                    eventItem.onclick = () => {
+                        if (modalContent && modalContainer) {
+                            modalContent.innerHTML = `
+                                <p><strong>地點:</strong> ${event.location}</p>
+                                <p><strong>時間:</strong> ${event.time}</p>
+                                <p><strong>停留時間:</strong> ${event.duration}</p>
+                                <p class="mt-4 text-sm text-gray-500">這是一個模擬詳情視窗。在真正的應用中，您可以編輯這些細節。</p>
+                            `;
+                            modalContainer.classList.remove('hidden');
+                        }
+                    };
+
+                    content.appendChild(eventItem);
+                });
+
+                dayCard.appendChild(content);
+                itineraryContainer.appendChild(dayCard);
+            });
+        }
+        
+        // 確保所有 DOM 元素準備就緒後才開始執行主邏輯
+        window.addEventListener('DOMContentLoaded', () => {
+
+            // 存取 DOM 元素
+            const authStatusElement = document.getElementById('auth-text');
+            const authIconElement = document.getElementById('auth-icon');
+            const loadBtn = document.getElementById('load-btn');
+            const saveBtn = document.getElementById('save-btn');
+            const itineraryContainer = document.getElementById('itinerary-container');
+            const messageBar = document.getElementById('message-bar');
+            const loadingSpinner = document.getElementById('loading-spinner');
+            const modalContainer = document.getElementById('modal-container');
+            const modalContent = document.getElementById('modal-content');
+            
+            // 由於 save/load 函數現在需要 messageBar 引用，我們將它們重新定義為閉包內的函數
+            
+            async function saveItinerary() {
+                if (!isAuthReady) {
+                    showMessageBar(messageBar, "請先等待認證完成。", 'red');
+                    return;
+                }
+                saveBtn.disabled = true;
+
+                try {
+                    const dataToSave = {
+                        itinerary: itineraryData.map(day => ({
+                            day: day.day,
+                            date: day.date,
+                            expanded: day.expanded,
+                            events: day.events
+                        })),
+                        updatedAt: new Date().toISOString(),
+                        updatedBy: userId
+                    };
+                    
+                    await setDoc(itineraryRef(), dataToSave);
+                    showMessageBar(messageBar, "行程已成功儲存到雲端！", 'green');
+                } catch (error) {
+                    console.error("儲存行程失敗:", error);
+                    showMessageBar(messageBar, "儲存行程失敗：" + error.message, 'red');
+                } finally {
+                    saveBtn.disabled = false;
+                }
+            }
+
+            async function loadItinerary() {
+                if (!isAuthReady) {
+                    showMessageBar(messageBar, "請先等待認證完成。", 'red');
+                    return;
+                }
+                loadBtn.disabled = true;
+
+                try {
+                    const docSnap = await getDoc(itineraryRef());
+                    if (docSnap.exists()) {
+                        const data = docSnap.data();
+                        if (data && data.itinerary) {
+                            itineraryData = data.itinerary;
+                            renderItinerary(itineraryContainer, modalContent, modalContainer, itineraryData);
+                            showMessageBar(messageBar, "行程已從雲端載入。", 'green');
                         } else {
-                            await signInAnonymously(window.auth);
+                            showMessageBar(messageBar, "雲端文件內容無效。", 'red');
+                        }
+                    } else {
+                        showMessageBar(messageBar, "雲端找不到儲存的行程，將使用初始數據。", 'orange');
+                        renderItinerary(itineraryContainer, modalContent, modalContainer, itineraryData);
+                    }
+                } catch (error) {
+                    console.error("載入行程失敗:", error);
+                    showMessageBar(messageBar, "載入行程失敗：" + error.message, 'red');
+                } finally {
+                    loadBtn.disabled = false;
+                }
+            }
+            
+            // 綁定事件監聽器
+            if (loadBtn) loadBtn.addEventListener('click', loadItinerary);
+            if (saveBtn) saveBtn.addEventListener('click', saveItinerary);
+
+
+            // 1. 處理認證
+            if (auth) {
+                onAuthStateChanged(auth, async (user) => {
+                    try {
+                        if (user) {
+                            userId = user.uid;
+                            if (authIconElement) authIconElement.classList.replace('text-gray-400', 'text-green-500');
+                            if (authStatusElement) authStatusElement.textContent = `已驗證使用者 (${userId.substring(0, 8)}...)`;
+                            isAuthReady = true;
+                        } else if (initialAuthToken) {
+                            await signInWithCustomToken(auth, initialAuthToken);
+                            // onAuthStateChanged 會再次觸發
+                        } else {
+                            await signInAnonymously(auth);
+                            // onAuthStateChanged 會再次觸發
                         }
                     } catch (error) {
-                        console.error("Firebase Sign-in failed:", error);
+                        console.error("Firebase 認證失敗:", error);
+                        if (authIconElement) authIconElement.classList.replace('text-gray-400', 'text-red-500');
+                        if (authStatusElement) authStatusElement.textContent = "認證失敗 (匿名)";
+                        isAuthReady = true;
                     }
-                }
-                // Once authenticated, the global db/auth objects are ready for the React app
-            });
-        } else {
-            console.error("Firebase configuration is missing or invalid.");
-            window.db = null;
-            window.auth = null;
-        }
-    </script>
 
-    <style>
-        /* Custom Styles for Dark Mode and Typography */
-        body {
-            font-family: 'Noto Sans TC', sans-serif;
-            background-color: #0d1117; /* Dark background */
-            color: #c9d1d9; /* Light text */
-        }
-        .timeline-container {
-            border-left: 2px solid #30363d; /* Dark timeline line */
-        }
-        .text-gradient {
-            background-image: linear-gradient(to right, #6EE7B7, #3B82F6);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-        /* Scrollbar styling for better dark mode experience */
-        ::-webkit-scrollbar {
-            width: 8px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #161b22;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #30363d;
-            border-radius: 4px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #484f58;
-        }
-    </style>
-</head>
-<body>
-
-<div id="root" class="min-h-screen"></div>
-
-<script type="text/babel">
-    const { useState, useEffect, useRef } = React;
-
-    // --- MOCK DATA WITH EXTERNAL IMAGE URLS (用於測試和展示) ---
-    const mockItineraryData = [
-        {
-            day: 1,
-            date: "10/01 (三)",
-            city: "大阪 (Osaka)",
-            imageUrl: 'https://placehold.co/1200x600/3B82F6/FFFFFF?text=Day+1+Osaka',
-            events: [
-                {
-                    id: '1-1',
-                    time: '09:00',
-                    location: '關西機場 (KIX)',
-                    details: '抵達關西機場，搭乘 Haruka 列車前往大阪市區，入住飯店。',
-                    imageUrl: 'https://placehold.co/400x200/4F46E5/FFFFFF?text=Kansai+Airport',
-                    notes: '兌換 JR Pass。',
-                },
-                {
-                    id: '1-2',
-                    time: '14:00',
-                    location: '大阪城 (Osaka Castle)',
-                    details: '參觀宏偉的歷史地標，周圍的公園在秋季景色宜人。',
-                    imageUrl: 'https://placehold.co/400x200/F97316/FFFFFF?text=Osaka+Castle',
-                    notes: '準備好舒適的鞋子。',
-                }
-            ]
-        },
-        {
-            day: 2,
-            date: "10/02 (四)",
-            city: "京都 (Kyoto)",
-            imageUrl: 'https://placehold.co/1200x600/10B981/FFFFFF?text=Day+2+Kyoto',
-            events: [
-                {
-                    id: '2-1',
-                    time: '10:00',
-                    location: '清水寺 (Kiyomizu-dera)',
-                    details: '參觀著名的木結構寺廟，欣賞京都全景。',
-                    imageUrl: 'https://placehold.co/400x200/10B981/FFFFFF?text=Kiyomizu+Temple',
-                    notes: '早上人潮較少。',
-                },
-                {
-                    id: '2-2',
-                    time: '15:00',
-                    location: '伏見稻荷大社 (Fushimi Inari)',
-                    details: '探索數千座紅色鳥居，感受神秘氛圍。',
-                    imageUrl: 'https://placehold.co/400x200/FACC15/000000?text=Fushimi+Inari',
-                    notes: '爬到山頂需要約 1.5 小時。',
-                }
-            ]
-        }
-    ];
-    // --- MOCK DATA END ---
-
-    // Utility function to get user path for Firestore
-    const getPath = (userId, collectionName, docId = null) => {
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        let path = `/artifacts/${appId}/users/${userId}/${collectionName}`;
-        if (docId) {
-            path += `/${docId}`;
-        }
-        return path;
-    };
-
-    // Utility function to get the current Firebase user ID
-    const getUserId = (auth) => {
-        return auth?.currentUser?.uid || 'anonymous';
-    };
-
-    // --- Gemini API Function: Search for a public image URL ---
-    const searchAndSetImage = async (query) => {
-        const apiKey = ""; 
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-
-        // System instruction guides the model to find a public image link
-        const systemPrompt = `你是一個圖像搜索助手。你的任務是根據提供的查詢，使用 Google Search 工具，找到一個代表該地點或事物的公共圖片 URL（必須是 HTTPS 連結）。只返回該圖片 URL，不要包含任何額外文字、解釋或 Markdown 格式。如果找不到公共 URL，則返回 "NOT_FOUND"。`;
-        const userQuery = `請為以下地點找到一個高品質的公共圖片 HTTPS URL: ${query}`;
-        
-        const payload = {
-            contents: [{ parts: [{ text: userQuery }] }],
-            // Enable Google Search grounding
-            tools: [{ "google_search": {} }], 
-            systemInstruction: {
-                parts: [{ text: systemPrompt }]
-            },
-        };
-
-        const maxRetries = 3;
-        let delay = 1000;
-
-        for (let i = 0; i < maxRetries; i++) {
-            try {
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-
-                const result = await response.json();
-                const text = result.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-
-                if (text && text.startsWith('https://')) {
-                    return text; // Return the found URL
-                } else if (text === "NOT_FOUND") {
-                    return null; // Model explicitly states nothing found
-                } else {
-                    console.warn("API returned non-URL text:", text);
-                    return null;
-                }
-
-            } catch (error) {
-                // Do not log retries as errors in the console
-                if (i < maxRetries - 1) {
-                    await new Promise(resolve => setTimeout(resolve, delay));
-                    delay *= 2; // Exponential backoff
-                } else {
-                    return null; // Final failure
-                }
-            }
-        }
-        return null;
-    };
-
-
-    // --- Component: Event Image with Fallback ---
-    const EventImage = ({ src, alt }) => {
-        const [imageSrc, setImageSrc] = useState(src);
-
-        // Fallback placeholder image URL (External and robust)
-        const fallbackUrl = "https://placehold.co/400x200/94A3B8/FFFFFF?text=Image+Missing";
-
-        const handleError = (e) => {
-            // Only set fallback if the current source isn't already the fallback
-            if (e.target.src !== fallbackUrl) {
-                setImageSrc(fallbackUrl);
-                console.warn(`圖片載入失敗: ${src}, 已使用備用圖。`);
-            }
-        };
-
-        useEffect(() => {
-            setImageSrc(src);
-        }, [src]);
-
-        return (
-            <img 
-                src={imageSrc} 
-                alt={alt} 
-                className="w-full h-full object-cover transition duration-300 ease-in-out transform group-hover:scale-[1.02]"
-                onError={handleError}
-                loading="lazy"
-            />
-        );
-    };
-
-    // --- Component: Timeline Event Card ---
-    const TimelineEvent = ({ event, dayIndex, eventIndex, onSelect }) => {
-        const defaultImageUrl = 'https://placehold.co/400x200/171717/3B82F6?text=No+Photo';
-        const imageUrl = event.imageUrl || defaultImageUrl;
-        
-        return (
-            <div 
-                className="group relative bg-[#161b22] p-5 rounded-xl shadow-lg border border-gray-900/50 hover:border-blue-500 transition-all cursor-pointer"
-                onClick={() => onSelect({ dayIndex, eventIndex, prevLoc: null })}
-            >
-                {/* Image Block: Using EventImage component for robustness */}
-                <div className="rounded-lg overflow-hidden mb-4 aspect-video">
-                    <EventImage src={imageUrl} alt={event.location} />
-                </div>
-                
-                <div className="absolute top-0 left-[-4px] w-1 h-full bg-blue-500 rounded-lg"></div>
-                <div className="flex items-center space-x-3">
-                    <i className="ph-clock-fill text-blue-400 text-lg"></i>
-                    <span className="text-xl font-semibold text-white">{event.time}</span>
-                </div>
-                <h3 className="text-2xl font-bold mt-2 text-gradient">{event.location}</h3>
-                <p className="text-slate-400 mt-1 line-clamp-2">{event.details}</p>
-                {event.notes && (
-                    <div className="mt-3 text-sm flex items-center text-yellow-400 bg-yellow-900/30 p-2 rounded-lg">
-                        <i className="ph-notepad-fill mr-2"></i>
-                        {event.notes}
-                    </div>
-                )}
-            </div>
-        );
-    };
-
-    // --- Component: Event Detail Modal (新增自動尋圖功能) ---
-    const EventDetailModal = ({ event, dayIndex, eventIndex, onClose, db, userId }) => {
-        const [isEditing, setIsEditing] = useState(false);
-        const [tempDetails, setTempDetails] = useState(event.details);
-        const [tempNotes, setTempNotes] = useState(event.notes || '');
-        const [tempImageUrl, setTempImageUrl] = useState(event.imageUrl || '');
-        const [isSearching, setIsSearching] = useState(false); // New state for search loading
-        const [searchError, setSearchError] = useState(null); // New state for search error
-        const modalRef = useRef(null);
-
-        const defaultImageUrl = 'https://placehold.co/800x400/171717/3B82F6?text=No+Photo';
-        const imageUrl = tempImageUrl || event.imageUrl || defaultImageUrl;
-
-        // --- New Function: Handle Image Search ---
-        const handleSearchImage = async () => {
-            setSearchError(null);
-            setIsSearching(true);
-            const query = `${event.city} ${event.location} 景點圖片`; 
-            
-            try {
-                const resultUrl = await searchAndSetImage(query);
-                if (resultUrl) {
-                    setTempImageUrl(resultUrl);
-                    // Use a custom UI alert instead of native alert
-                    alert("成功找到圖片連結！請點擊 '儲存變更' 來更新行程。");
-                } else {
-                    setSearchError("抱歉，無法自動找到該景點的公共圖片連結。請嘗試手動輸入。");
-                }
-            } catch (e) {
-                setSearchError("圖片搜索發生錯誤。");
-                console.error("Image search error:", e);
-            } finally {
-                setIsSearching(false);
-            }
-        };
-
-
-        const handleSave = async () => {
-            if (!db || !userId) {
-                console.error("Firebase is not initialized or user ID is missing.");
-                return;
-            }
-
-            // Simple validation for the new image URL (must be HTTPS)
-            if (tempImageUrl && tempImageUrl !== '' && !tempImageUrl.startsWith('https://')) {
-                alert("圖片連結必須是有效的 HTTPS 網址！");
-                return;
-            }
-
-            try {
-                const dayDocId = `day-${dayIndex + 1}`;
-                const eventsCollectionPath = getPath(userId, `itineraries/${dayDocId}/events`, event.id);
-                const eventDocRef = window.doc(db, eventsCollectionPath); // FIX: Use window.doc
-                
-                // Construct update payload
-                const updatePayload = {
-                    details: tempDetails,
-                    notes: tempNotes,
-                    // Store the new or updated image URL
-                    imageUrl: tempImageUrl, 
-                };
-
-                await window.setDoc(eventDocRef, updatePayload, { merge: true }); // FIX: Use window.setDoc
-
-                console.log("Event updated successfully!");
-                setIsEditing(false);
-            } catch (error) {
-                console.error("Error updating event:", error);
-                // Use a custom UI alert instead of native alert
-                alert("更新失敗，請檢查控制台錯誤。");
-            }
-        };
-
-        const handleDelete = async () => {
-            if (!db || !userId) {
-                console.error("Firebase is not initialized or user ID is missing.");
-                return;
-            }
-            // Use a custom UI confirm instead of native confirm
-            if (!window.confirm(`確定要刪除事件 ${event.location} 嗎？`)) return;
-
-            try {
-                const dayDocId = `day-${dayIndex + 1}`;
-                const eventsCollectionPath = getPath(userId, `itineraries/${dayDocId}/events`, event.id);
-                const eventDocRef = window.doc(db, eventsCollectionPath); // FIX: Use window.doc
-                await window.deleteDoc(eventDocRef); // FIX: Use window.deleteDoc
-                onClose();
-            } catch (error) {
-                console.error("Error deleting event:", error);
-                alert("刪除失敗，請檢查控制台錯誤。");
-            }
-        };
-
-        const handleOutsideClick = (e) => {
-            if (modalRef.current && !modalRef.current.contains(e.target)) {
-                onClose();
-            }
-        };
-
-        useEffect(() => {
-            document.addEventListener('mousedown', handleOutsideClick);
-            return () => document.removeEventListener('mousedown', handleOutsideClick);
-        }, []);
-
-
-        return (
-            <div className="fixed inset-0 bg-black bg-opacity-80 backdrop-blur-sm z-50 flex justify-center items-center p-4">
-                <div ref={modalRef} className="bg-[#161b22] text-white rounded-xl shadow-2xl w-full max-w-2xl transform transition-all duration-300 scale-100 border border-gray-700/50">
-                    <header className="p-6 border-b border-gray-700/50 relative">
-                        <h2 className="text-3xl font-bold text-gradient">{event.location}</h2>
-                        <p className="mt-1 text-slate-400 text-lg">
-                            <i className="ph-clock-fill mr-2"></i>{event.time}
-                            <span className="ml-4"><i className="ph-map-pin-fill mr-2"></i>{event.location}</span>
-                        </p>
-                        <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-white transition duration-200">
-                            <i className="ph-x-circle-fill text-2xl"></i>
-                        </button>
-                    </header>
-
-                    {/* Image Display */}
-                    <div className="h-64 overflow-hidden">
-                        {/* Display image using the temporary state for live preview */}
-                        <EventImage src={imageUrl} alt={event.location} />
-                    </div>
-
-                    <div className="p-6 space-y-4">
-                        <div className="flex justify-end space-x-3">
-                            {isEditing ? (
-                                <>
-                                    <button
-                                        onClick={() => setIsEditing(false)}
-                                        className="px-4 py-2 rounded-lg bg-gray-600 hover:bg-gray-500 transition duration-200 text-white font-medium"
-                                        disabled={isSearching}
-                                    >
-                                        取消
-                                    </button>
-                                    <button
-                                        onClick={handleSave}
-                                        className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 transition duration-200 text-white font-medium disabled:opacity-50"
-                                        disabled={isSearching}
-                                    >
-                                        儲存變更
-                                    </button>
-                                </>
-                            ) : (
-                                <>
-                                    <button
-                                        onClick={handleDelete}
-                                        className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 transition duration-200 text-white font-medium"
-                                    >
-                                        <i className="ph-trash-fill mr-1"></i> 刪除
-                                    </button>
-                                    <button
-                                        onClick={() => setIsEditing(true)}
-                                        className="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-500 transition duration-200 text-white font-medium"
-                                    >
-                                        <i className="ph-pencil-simple-fill mr-1"></i> 編輯
-                                    </button>
-                                </>
-                            )}
-                        </div>
-
-                        <h3 className="text-lg font-semibold border-b border-gray-700/50 pb-1 text-white">活動詳情</h3>
-                        {isEditing ? (
-                            <textarea
-                                value={tempDetails}
-                                onChange={(e) => setTempDetails(e.target.value)}
-                                className="w-full p-3 rounded-lg bg-gray-800 text-white border border-gray-700 focus:ring-blue-500 focus:border-blue-500"
-                                rows="3"
-                            />
-                        ) : (
-                            <p className="text-slate-300 whitespace-pre-wrap">{event.details}</p>
-                        )}
-
-                        <h3 className="text-lg font-semibold border-b border-gray-700/50 pb-1 text-white">圖片與筆記</h3>
-                        {isEditing ? (
-                            <>
-                                <label className="text-sm font-medium text-slate-400 block mb-1">景點圖片 (HTTPS URL):</label>
-                                <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
-                                    <input
-                                        type="text"
-                                        placeholder="輸入外部圖片 HTTPS 連結..."
-                                        value={tempImageUrl}
-                                        onChange={(e) => {
-                                            setTempImageUrl(e.target.value);
-                                            setSearchError(null); // Clear error when manually typing
-                                        }}
-                                        className="flex-grow p-3 rounded-lg bg-gray-800 text-white border border-gray-700 focus:ring-blue-500 focus:border-blue-500"
-                                    />
-                                    <button
-                                        onClick={handleSearchImage}
-                                        className="flex-shrink-0 px-4 py-3 rounded-lg bg-indigo-600 hover:bg-indigo-500 transition duration-200 text-white font-medium flex items-center justify-center disabled:bg-gray-700 disabled:cursor-not-allowed"
-                                        disabled={isSearching}
-                                    >
-                                        {isSearching ? (
-                                            <i className="ph-circle-notch-bold animate-spin text-lg mr-2"></i>
-                                        ) : (
-                                            <i className="ph-magnifying-glass-plus-fill text-lg sm:mr-2"></i>
-                                        )}
-                                        {isSearching ? '搜索中...' : <span className="hidden sm:inline">自動尋圖</span>}
-                                    </button>
-                                </div>
-                                {searchError && (
-                                    <p className="text-sm text-red-400 mt-2 p-2 bg-red-900/30 rounded-lg flex items-center">
-                                        <i className="ph-warning-fill mr-2 text-lg"></i>
-                                        {searchError}
-                                    </p>
-                                )}
-                                <label className="text-sm font-medium text-slate-400 block mt-4 mb-1">額外筆記:</label>
-                                <textarea
-                                    value={tempNotes}
-                                    onChange={(e) => setTempNotes(e.target.value)}
-                                    className="w-full p-3 rounded-lg bg-gray-800 text-white border border-gray-700 focus:ring-blue-500 focus:border-blue-500"
-                                    rows="2"
-                                    placeholder="輸入額外筆記..."
-                                />
-                            </>
-                        ) : (
-                            <p className="text-slate-300 italic">{event.notes || '無額外筆記'}</p>
-                        )}
-                    </div>
-                </div>
-            </div>
-        );
-    };
-
-    // --- Main App Component (Logic remains the same) ---
-    const App = () => {
-        const [itineraryData, setItineraryData] = useState([]);
-        const [auth, setAuth] = useState(null);
-        const [db, setDb] = useState(null);
-        const [userId, setUserId] = useState(null);
-        const [isLoading, setIsLoading] = useState(true);
-        const [selectedEvent, setSelectedEvent] = useState(null);
-        const [error, setError] = useState(null);
-
-        // 1. Initialization and Auth Listener
-        useEffect(() => {
-            if (window.db && window.auth) {
-                setDb(window.db);
-                setAuth(window.auth);
-
-                // FIX: onAuthStateChanged is now available on window
-                const unsubscribe = window.onAuthStateChanged(window.auth, (user) => {
-                    if (user) {
-                        setUserId(user.uid);
-                        console.log("Authenticated with UID:", user.uid);
-                    } else {
-                        // This case should be rare if the initial logic works, but handles sign-out
-                        setUserId(getUserId(window.auth));
+                    if (isAuthReady) {
+                        if (loadBtn) loadBtn.disabled = false;
+                        if (saveBtn) saveBtn.disabled = false;
+                        
+                        // 在認證準備就緒後，渲染初始數據並開始監聽
+                        renderItinerary(itineraryContainer, modalContent, modalContainer, itineraryData);
+                        if (loadingSpinner) loadingSpinner.classList.add('hidden');
+                        
+                        // 2. 設定即時監聽 (Optional for this public doc, but good practice)
+                        setupSnapshotListener(itineraryContainer, modalContent, modalContainer, messageBar);
                     }
-                    setIsLoading(false);
                 });
-
-                return () => unsubscribe();
             } else {
-                // If Firebase fails to initialize, use mock data
-                setItineraryData(mockItineraryData);
-                setIsLoading(false);
-                setError("Firebase 連線失敗，顯示本地示範數據。");
+                // 如果 Firebase 初始化失敗 (app/db/auth 為 null)
+                if (authStatusElement) authStatusElement.textContent = "Firebase 服務無法使用";
+                if (loadingSpinner) loadingSpinner.classList.add('hidden');
             }
-        }, []);
+            
+            function setupSnapshotListener(itineraryContainer, modalContent, modalContainer, messageBar) {
+                if (!isAuthReady) return;
 
-        // 2. Data Listener (Runs AFTER Auth is ready)
-        useEffect(() => {
-            if (!db || !userId || isLoading) return;
-
-            // Fetch the list of day documents (e.g., 'day-1', 'day-2')
-            const itineraryRef = window.collection(db, getPath(userId, 'itineraries')); // FIX: Use window.collection
-
-            const unsubscribe = window.onSnapshot(itineraryRef, async (itinerarySnapshot) => { // FIX: Use window.onSnapshot
-                const days = [];
-                for (const docSnapshot of itinerarySnapshot.docs) {
-                    const dayData = docSnapshot.data();
-                    const dayDocId = docSnapshot.id;
-                    const eventsCollectionRef = window.collection(db, getPath(userId, `itineraries/${dayDocId}/events`)); // FIX: Use window.collection
-                    
-                    try {
-                        const eventsSnapshot = await window.getDocs(eventsCollectionRef); // FIX: Use window.getDocs
-                        const events = eventsSnapshot.docs.map(e => ({ id: e.id, ...e.data() }));
-
-                        // Sort events by time
-                        events.sort((a, b) => a.time.localeCompare(b.time));
-
-                        days.push({
-                            ...dayData,
-                            dayDocId: dayDocId,
-                            events: events,
-                            // Fallback image for day header
-                            imageUrl: dayData.imageUrl || 'https://placehold.co/1200x600/171717/FACC15?text=Day+Header'
-                        });
-
-                    } catch (e) {
-                        console.error(`Error fetching events for ${dayDocId}:`, e);
+                // 即時監聽公共行程文件的變更
+                onSnapshot(itineraryRef(), (docSnapshot) => {
+                    if (docSnapshot.exists()) {
+                        const data = docSnapshot.data();
+                        if (data && data.itinerary) {
+                            itineraryData = data.itinerary;
+                            renderItinerary(itineraryContainer, modalContent, modalContainer, itineraryData);
+                            showMessageBar(messageBar, "行程已從雲端即時更新。", 'green');
+                        }
+                    } else {
+                        // 如果文件不存在，確保使用本地數據
+                        console.log("雲端行程文件不存在，使用本地初始數據。");
+                        renderItinerary(itineraryContainer, modalContent, modalContainer, itineraryData);
                     }
-                }
-                
-                // Sort days by day number (e.g., day-1, day-2)
-                days.sort((a, b) => {
-                    const numA = parseInt(a.dayDocId.split('-')[1]);
-                    const numB = parseInt(b.dayDocId.split('-')[1]);
-                    return numA - numB;
+                }, (error) => {
+                    console.error("設定 Firestore 監聽失敗:", error);
+                    showMessageBar(messageBar, "無法監聽雲端行程更新。", 'red');
                 });
-
-                // If no data, use mock data as template for user
-                if (days.length === 0) {
-                    // This block can be used to write initial mock data to Firestore if desired
-                    setItineraryData(mockItineraryData); 
-                    console.log("No data found. Displaying mock data.");
-                } else {
-                    setItineraryData(days);
-                }
-
-            }, (err) => {
-                console.error("Firestore snapshot error:", err);
-                setError("資料載入失敗，請檢查網路連線。");
-            });
-
-            return () => unsubscribe();
-
-        }, [db, userId, isLoading]);
-
-
-        const handleEventSelect = (details) => {
-            setSelectedEvent(details);
-        };
-
-        const handleCloseModal = () => {
-            setSelectedEvent(null);
-        };
+            }
+        });
         
-        // --- Render Logic ---
-
-        if (isLoading) {
-            return (
-                <div className="flex justify-center items-center h-screen">
-                    <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-500"></div>
-                    <p className="ml-4 text-xl text-slate-400">載入中...</p>
-                </div>
-            );
-        }
-
-        if (error && itineraryData.length === 0) {
-            return (
-                <div className="p-8 text-center">
-                    <h1 className="text-3xl font-bold text-red-500">連線錯誤</h1>
-                    <p className="mt-4 text-slate-400">{error}</p>
-                    <p className="mt-2 text-slate-400">目前顯示示範行程，請修正 Firebase 連線或手動新增數據。</p>
-                </div>
-            );
-        }
-
-        return (
-            <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
-                <header className="text-center py-8 mb-8 border-b border-gray-700/50">
-                    <h1 className="text-4xl sm:text-5xl font-extrabold text-gradient">
-                        <i className="ph-airplane-takeoff-fill mr-3"></i>2025 日本關西/山陽之旅
-                    </h1>
-                    <p className="mt-3 text-lg text-slate-400">
-                        為您精心規劃的每日行程時間軸 (用戶 ID: {userId})
-                    </p>
-                </header>
-
-                <main>
-                    <div className="timeline-container relative pt-4">
-                        {itineraryData.map((currentDayData, dayIndex) => (
-                            <div key={currentDayData.dayDocId} className="mb-12 pl-12 relative group">
-                                {/* Day Header Section */}
-                                <div className="absolute left-4 top-[-2px] w-5 h-5 rounded-full bg-blue-600 z-10 border-4 border-[#0d1117] transition-all group-hover:bg-green-500"></div>
-                                <div className="bg-[#1e252e] p-4 rounded-xl shadow-xl mb-6 -mt-1 border border-gray-700/50">
-                                    <h2 className="text-3xl font-bold text-white mb-1">
-                                        Day {currentDayData.day}: {currentDayData.city}
-                                    </h2>
-                                    <p className="text-blue-400 text-lg font-medium">{currentDayData.date}</p>
-                                </div>
-                                
-                                {/* Image for the Day */}
-                                <div className="rounded-xl overflow-hidden mb-6 shadow-2xl border border-gray-700/50">
-                                    <EventImage src={currentDayData.imageUrl} alt={`Day ${currentDayData.day} - ${currentDayData.city}`} />
-                                </div>
-
-                                {/* Events List for the Day */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                    {currentDayData.events.map((event, eventIndex) => (
-                                        <TimelineEvent 
-                                            key={event.id}
-                                            event={event}
-                                            dayIndex={dayIndex}
-                                            eventIndex={eventIndex}
-                                            onSelect={handleEventSelect}
-                                        />
-                                    ))}
-                                </div>
-
-                                {/* End of Day Marker */}
-                                <div className="mt-8">
-                                    <div className="absolute left-4 top-1 w-4 h-4 rounded-full bg-gray-700 z-10 border-4 border-black"></div>
-                                     <div className="text-sm text-slate-500 italic">Day {currentDayData.day} 結束 • 休息充電 🔋</div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </main>
-
-                <footer className="py-8 text-center text-slate-700 text-xs border-t border-gray-900/50 mt-8">
-                    <p>Travel Plan 2025 • Built with Vibe Coding</p>
-                    <p>Powered by Google Gemini & Firebase Firestore</p>
-                </footer>
-                
-                {/* Modal Display */}
-                {selectedEvent && (
-                    <EventDetailModal
-                        event={itineraryData[selectedEvent.dayIndex].events[selectedEvent.eventIndex]}
-                        dayIndex={selectedEvent.dayIndex}
-                        eventIndex={selectedEvent.eventIndex}
-                        prevLoc={selectedEvent.prevLoc}
-                        onClose={handleCloseModal}
-                        db={db}
-                        userId={userId}
-                    />
-                )}
-            </div>
-        );
-    };
-
-    const root = ReactDOM.createRoot(document.getElementById('root'));
-    // Render only after the global firebase object is available
-    window.addEventListener('load', () => {
-        root.render(<App />);
-    });
-</script>
+    </script>
 </body>
 </html>
